@@ -1,1 +1,0 @@
-please place the CHB-MIT EEG dataset here!
