@@ -2,19 +2,81 @@ import numpy as np
 import matplotlib.pyplot as plt
 import mne
 from pathlib import Path
+from os import path
+import pickle
+
 
 # chb-mit includes 23 channels sampled at 256hz
 
-# function that gets summary files, reads them, and gets seizure timestamps
-def get_seizure_timestamps():
-    pass
+# parent function to preprocess data in the Data directory for some given window size
+def preprocess_data(window_size=12):
+    # checking if summary pickle exists
+    if Path.exists(Path('./Processed_Data/summary.pickle')):
+        # load the pickle
+        pickle_file = open(Path('./Processed_Data/summary.pickle'),'rb')
+        final_mapping = pickle.load(pickle_file)
+        pickle_file.close()
+        print("LOADED A PICKLE FILE OF PROCESSED SUMMARIES!")
+        print(final_mapping)
+    else:
+        # getting the summary data
+        summary_files = get_summary_files()
+        # getting dictionary mapping for every seizure
+        final_mapping = {}
+        for summary_file in summary_files:
+            final_mapping.update(get_seizure_timestamps(summary_file))
+        # combining dictionaries into 1 and then we can keep this object as a pickle object
+        # writing the pickle to filesystem
+        pickle_file = open(Path('./Processed_Data/summary.pickle'),'wb')
+        pickle.dump(final_mapping,pickle_file)
+        pickle_file.close()
+        print("WROTE A PICKLE OF PROCESSED SUMMARIES!")
+    # getting the eeg data files
+    eeg_files = get_eegs()
+    # we only want to process eeg data one summary file at a time
+    # we want to keep them together so we have it organized per patient
+    # TODO: file processing + tagging (ideally add tagging to the window_recordings() function)
+
+
+
+# function that retrieves all summary text files
+def get_summary_files():
+    file_paths = Path.glob(Path('./Data'),'*/*-summary.txt')
+    path_list = list(file_paths)
+    return [str(path) for path in path_list]
+
+# function that gets seizure timestamps from a summary file
+# records should be "filename: [(start_time,end_time),(start_time_2,end_time_2),...]"
+def get_seizure_timestamps(summary_filepath):
+    # reading in the summary file
+    f = open(summary_filepath, 'r')
+    lines = f.readlines()
+    f.close()
+    # filtering lines we dont need
+    seizure_mapping = {}
+    curr_filename = None
+    for idx,line in enumerate(lines):
+        line = line.lower()
+        if line.startswith('file name'):
+            # start a new record
+            curr_filename = line.strip().split(':')[1].strip()
+            seizure_mapping[curr_filename] = []
+        if line.startswith('seizure start time'):
+            # the next line will be the seizure end time
+            seizure_start_time = int(line.split(':')[1].split()[0])
+            seizure_end_time = int(lines[idx+1].split(':')[1].split()[0])
+            # adding this data to the dictionary entry
+            seizure_mapping[curr_filename].append((seizure_start_time,seizure_end_time))
+    return seizure_mapping
+
 
 # function that searches the data directory for filenames globbed as *.edf (all our data files for the eeg recordings)
 def get_eegs():
-    eeg_paths = Path.glob(Path('./Data'),'*/*.edf')
-    #seizure_paths = Path.glob(Path('./Data'),'*/*.seizures')
-    path_list = list(eeg_paths) #+ list(seizure_paths)
+    eeg_paths = Path.glob(Path('./Data'), '*/*.edf')
+    # seizure_paths = Path.glob(Path('./Data'),'*/*.seizures')
+    path_list = list(eeg_paths)  # + list(seizure_paths)
     return [str(path) for path in path_list]
+
 
 # function that takes an eeg recording file and splits it into windows based on a window size and sampling frequency
 # NOTE: window size is in seconds-> number of samples will be taken care of automagically by this function
@@ -35,11 +97,11 @@ def window_recordings(file_path, window_size=12):
     curr_window = 0
     new_data = []
     while curr_window != total_samples:
-        window = eeg_raw_data[:,curr_window:curr_window+(sampling_frequency*window_size)]
+        window = eeg_raw_data[:, curr_window:curr_window + (sampling_frequency * window_size)]
         # we want to break if the window is less than our desired window size by splicing
-        if window.shape[1]<sampling_frequency*window_size:
+        if window.shape[1] < sampling_frequency * window_size:
             break
-        #print(window.shape)
+        # print(window.shape)
         new_data.append(window)
         # moving the window by just 1 second
         curr_window += sampling_frequency
@@ -47,18 +109,22 @@ def window_recordings(file_path, window_size=12):
     # we want to return something like (window,num_channels,samples)
     return np.array(new_data)
 
+
 # function that takes an eeg recording, and applies the short term fourier transform with window and overlap parameters
 # we filter out noise frequency and DC frequency specific to the CHB-MIT scalp EEG dataset
-def stft_recordings(eeg_data,window=256,overlap=None):
+def stft_recordings(eeg_data, window=256, overlap=None):
     # applying stft to data
-    frequencies = mne.time_frequency.stft(eeg_data,wsize=window,tstep=overlap)
+    frequencies = mne.time_frequency.stft(eeg_data, wsize=window, tstep=overlap)
     # removing DC component (0 Hz), the 57-63Hz and 117-123Hz bands (specific for
     frequencies = np.delete(frequencies, [0, *[i for i in range(57, 64, 1)], *[i for i in range(117, 124, 1)]], axis=1)
     return frequencies
 
+
 '''
     Below is some basic logic I wrote while testing stuff
 '''
+
+#preprocess_data()
 
 '''
 # read in an edf file
@@ -101,5 +167,3 @@ test_fft = np.delete(test_fft,[0,*[i for i in range(57,64,1)],*[i for i in range
 
 print(test_fft.shape)
 '''
-
-
