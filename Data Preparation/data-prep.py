@@ -80,7 +80,9 @@ def get_eegs():
 
 # function that takes an eeg recording file and splits it into windows based on a window size and sampling frequency
 # NOTE: window size is in seconds-> number of samples will be taken care of automagically by this function
-def window_recordings(file_path, window_size=12):
+# seizure times is the list of tuples [(start_time,end_time),(start_time_2,end_time_2),...]
+# TODO: implement tagging here
+def window_recordings(file_path, seizure_times, window_size=12):
     # reading the eeg file
     eeg_raw = mne.io.read_raw_edf(file_path)
 
@@ -106,7 +108,7 @@ def window_recordings(file_path, window_size=12):
         # moving the window by just 1 second
         curr_window += sampling_frequency
 
-    # we want to return something like (window,num_channels,samples)
+    # we want to return something like (window,num_channels,samples),[labels for each window]
     return np.array(new_data)
 
 
