@@ -4,6 +4,7 @@ import mne
 from pathlib import Path
 from os import path
 import pickle
+import scipy.signal as signal
 
 
 # chb-mit includes 23 channels sampled at 256hz
@@ -114,9 +115,11 @@ def window_recordings(file_path, seizure_times, window_size=12):
 
 # function that takes an eeg recording, and applies the short term fourier transform with window and overlap parameters
 # we filter out noise frequency and DC frequency specific to the CHB-MIT scalp EEG dataset
-def stft_recordings(eeg_data, window=256, overlap=None):
+def stft_recordings(eeg_data, sampling_frequency=256, window=256, overlap=None):
     # applying stft to data
-    frequencies = mne.time_frequency.stft(eeg_data, wsize=window, tstep=overlap)
+    _,_,frequencies = signal.stft(eeg_data, fs=sampling_frequency, nperseg= 256, noverlap=overlap)
+    # removing the start and end times to be consistent with the paper
+    frequencies = frequencies[:,:,1:-1]
     # removing DC component (0 Hz), the 57-63Hz and 117-123Hz bands (specific for
     frequencies = np.delete(frequencies, [0, *[i for i in range(57, 64, 1)], *[i for i in range(117, 124, 1)]], axis=1)
     return frequencies
@@ -127,6 +130,13 @@ def stft_recordings(eeg_data, window=256, overlap=None):
 '''
 
 #preprocess_data()
+
+'''
+files = get_eegs()[0]
+window_test = window_recordings(files,None)[0]
+test_fft = stft_recordings(window_test)
+print(test_fft.shape)
+'''
 
 '''
 # read in an edf file
@@ -155,11 +165,15 @@ test_data = test.get_data()
 print(test_data.shape)
 
 # getting 12 seconds of data based on sampling rate of 256 samples a second
-test_data = test_data[:,:3072]
+test_data = test_data[:,:256*12]
 print(test_data.shape)
 
 # short time fast fourier transform
-test_fft = mne.time_frequency.stft(test_data,wsize=256)
+#test_fft = mne.time_frequency.stft(test_data,wsize=256)
+f,t,test_fft = signal.stft(test_data,256)
+print(f)
+print(t)
+print(test_fft.shape)
 # (22,129,7200)
 # 22 channels, 129 frequencies (0 to 128), and 7200 timesteps by shifting half a window each time
 print(test_fft.shape)
