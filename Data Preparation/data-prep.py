@@ -2,9 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import mne
 from pathlib import Path
+import os
 from os import path
 import pickle
 import scipy.signal as signal
+from datetime import datetime
 
 
 # chb-mit includes 23 channels sampled at 256hz
@@ -14,7 +16,7 @@ def preprocess_data(window_size=12):
     # checking if summary pickle exists
     if Path.exists(Path('./Processed_Data/summary.pickle')):
         # load the pickle
-        pickle_file = open(Path('./Processed_Data/summary.pickle'),'rb')
+        pickle_file = open(Path('./Processed_Data/summary.pickle'), 'rb')
         final_mapping = pickle.load(pickle_file)
         pickle_file.close()
         print("LOADED A PICKLE FILE OF PROCESSED SUMMARIES!")
@@ -22,14 +24,16 @@ def preprocess_data(window_size=12):
     else:
         # getting the summary data
         summary_files = get_summary_files()
-        # getting dictionary mapping for every seizure
+        # getting dictionary mapping for metadata for all files
         final_mapping = {}
         for summary_file in summary_files:
-            final_mapping.update(get_seizure_timestamps(summary_file))
+            # mapping should only have "chb01" not "chb01-summary.txt"
+            final_mapping[os.path.basename(summary_file)[:5]] = get_seizure_timestamps(summary_file)
+            # final_mapping.update(get_seizure_timestamps(summary_file))
         # combining dictionaries into 1 and then we can keep this object as a pickle object
         # writing the pickle to filesystem
-        pickle_file = open(Path('./Processed_Data/summary.pickle'),'wb')
-        pickle.dump(final_mapping,pickle_file)
+        pickle_file = open(Path('./Processed_Data/summary.pickle'), 'wb')
+        pickle.dump(final_mapping, pickle_file)
         pickle_file.close()
         print("WROTE A PICKLE OF PROCESSED SUMMARIES!")
     # getting the eeg data files
@@ -39,36 +43,61 @@ def preprocess_data(window_size=12):
     # TODO: file processing + tagging (ideally add tagging to the window_recordings() function)
 
 
-
 # function that retrieves all summary text files
 def get_summary_files():
-    file_paths = Path.glob(Path('./Data'),'*/*-summary.txt')
+    file_paths = Path.glob(Path('./Data'), '*/*-summary.txt')
     path_list = list(file_paths)
     return [str(path) for path in path_list]
 
-# function that gets seizure timestamps from a summary file
-# records should be "filename: [(start_time,end_time),(start_time_2,end_time_2),...]"
+
+# function that gets seizure timestamps from a summary file and the associated time period
+# records should be {filename: [(file_start,file_end),(seizure_start,seizure_end),(seizure_start_2,seizure_end_2),...]}
+# we return a list of records for this summary filepath
 def get_seizure_timestamps(summary_filepath):
     # reading in the summary file
     f = open(summary_filepath, 'r')
     lines = f.readlines()
     f.close()
     # filtering lines we dont need
+    total_files = []
     seizure_mapping = {}
     curr_filename = None
-    for idx,line in enumerate(lines):
+    for idx, line in enumerate(lines):
         line = line.lower()
         if line.startswith('file name'):
             # start a new record
             curr_filename = line.strip().split(':')[1].strip()
-            seizure_mapping[curr_filename] = []
+            # next 2 lines are file start and end time
+
+            # getting hour, minutes, seconds
+            file_start_elements = lines[idx + 1].split(':')
+            file_start_elements = file_start_elements[len(file_start_elements) - 3:]
+
+            file_end_elements = lines[idx + 2].split(':')
+            file_end_elements = file_end_elements[len(file_end_elements) - 3:]
+
+            # IMPORTANT: CHB24 has no file start and end times, so we will need to generate those
+            if 'chb24' in curr_filename:
+                file_start = (None,None,None)
+                file_end = (None,None,None)
+            else:
+                file_start = (s_hour, s_min, s_sec) = [int(element) for element in file_start_elements]
+                file_end = (e_hour, e_min, e_sec) = [int(element) for element in file_end_elements]
+
+
+            if len(seizure_mapping) != 0:
+                total_files.append(seizure_mapping)
+                seizure_mapping = {}
+            seizure_mapping[curr_filename] = [(file_start, file_end)]
         if line.startswith('seizure start time'):
             # the next line will be the seizure end time
             seizure_start_time = int(line.split(':')[1].split()[0])
-            seizure_end_time = int(lines[idx+1].split(':')[1].split()[0])
+            seizure_end_time = int(lines[idx + 1].split(':')[1].split()[0])
             # adding this data to the dictionary entry
-            seizure_mapping[curr_filename].append((seizure_start_time,seizure_end_time))
-    return seizure_mapping
+            seizure_mapping[curr_filename].append((seizure_start_time, seizure_end_time))
+    # appending the final filename to the total list
+    total_files.append(seizure_mapping)
+    return total_files
 
 
 # function that searches the data directory for filenames globbed as *.edf (all our data files for the eeg recordings)
@@ -117,10 +146,10 @@ def window_recordings(file_path, seizure_times, window_size=12):
 # we filter out noise frequency and DC frequency specific to the CHB-MIT scalp EEG dataset
 def stft_recordings(eeg_data, sampling_frequency=256, window=256, overlap=None):
     # applying stft to data
-    _,_,frequencies = signal.stft(eeg_data, fs=sampling_frequency, nperseg= 256, noverlap=overlap)
+    _, _, frequencies = signal.stft(eeg_data, fs=sampling_frequency, nperseg=256, noverlap=overlap)
     # removing the start and end times to be consistent with the paper
-    frequencies = frequencies[:,:,1:-1]
-    # removing DC component (0 Hz), the 57-63Hz and 117-123Hz bands (specific for
+    frequencies = frequencies[:, :, 1:-1]
+    # removing DC component (0 Hz), the 57-63Hz and 117-123Hz bands (specific for chb-mit dataset)
     frequencies = np.delete(frequencies, [0, *[i for i in range(57, 64, 1)], *[i for i in range(117, 124, 1)]], axis=1)
     return frequencies
 
