@@ -113,8 +113,8 @@ def get_eegs():
 # seizure times is the list of tuples [(start_time,end_time),(start_time_2,end_time_2),...]
 # TODO: implement tagging here
 def window_recordings(file_path, seizure_times, window_size=12):
-    # reading the eeg file
-    eeg_raw = mne.io.read_raw_edf(file_path)
+    # reading the eeg file and excluding dummy '-' channels
+    eeg_raw = mne.io.read_raw_edf(file_path,exclude=['-'])
 
     # removing the redundant channel
     eeg_raw = eeg_raw.drop_channels(['T8-P8-1']).rename_channels({'T8-P8-0': 'T8-P8'})
@@ -169,7 +169,7 @@ print(test_fft.shape)
 
 '''
 # read in an edf file
-test = mne.io.read_raw_edf('./Data/chb01/chb01_01.edf')
+test = mne.io.read_raw_edf('./Data/chb14/chb14_01.edf',exclude=['-'])
 print(test.info)
 print(test.info['ch_names'])
 
