@@ -28,6 +28,8 @@ def preprocess_data(window_size=12):
             # mapping should only have "chb01" not "chb01-summary.txt"
             record_list = get_seizure_timestamps(summary_file)
             if 'chb24' in summary_file:
+                # need to fetch records that were not annotated in chb24 summary file
+                record_list = grab_missing_records(record_list)
                 # need to generate timestamps for record_list since these are not given
                 record_list = generate_timesteps(record_list, 'chb24')
             final_mapping[os.path.basename(summary_file)[:5]] = record_list
@@ -38,12 +40,19 @@ def preprocess_data(window_size=12):
         pickle.dump(final_mapping, pickle_file)
         pickle_file.close()
         print("WROTE A PICKLE OF PROCESSED SUMMARIES!")
+
+    # validating the mapping based on records file
+    print('validating that all record metadata was grabbed ...')
+    missing = validate_records(os.path.join('.','Data','RECORDS'),final_mapping)
+    if len(missing) ==0:
+        print('ALL RECORD METADATA VALIDATED AND SUCCESSFULLY GRABBED!')
+
     # getting the eeg data files
     eeg_files = get_eegs()
     # we only want to process eeg data one summary file at a time
     # we want to keep them together so we have it organized per patient
     # TODO: file processing + tagging (ideally add tagging to the window_recordings() function)
-
+    return final_mapping
 
 # function that retrieves all summary text files
 def get_summary_files():
@@ -191,13 +200,59 @@ def stft_recordings(eeg_data, sampling_frequency=256, window=256, overlap=None):
     frequencies = np.delete(frequencies, [0, *[i for i in range(57, 64, 1)], *[i for i in range(117, 124, 1)]], axis=1)
     return frequencies
 
+# function that validates whether we have grabbed all records
+# this returns a list of records which are provided in the dataset for chb-mit, but we haven't grabbed
+# ideally, this list should be empty
+def validate_records(record_list_path,summary_dictionary):
+    missed_records = []
+    # getting all record names in the summary dictionary first
+    record_names = {}
+    for patient_name in summary_dictionary:
+        for record in summary_dictionary[patient_name]:
+            edf_file = list(record.keys())[0]
+            record_names[edf_file] = 1
+    file = open(record_list_path,'r')
+    edf_file_list = file.readlines()
+    for filename in edf_file_list:
+        filename = os.path.basename(filename.strip())
+        if filename not in record_names:
+           missed_records.append(filename)
+    return missed_records
 
+# the only missing records is in patient 24 due to annotators not putting all data in the summary file
+# so, we need to add these records to the processed summary dictionary
+# the argument is the specific record list for patient 24
+def grab_missing_records(record_list):
+    new_record_list = []
+    missing_records = ['chb24_02.edf', 'chb24_05.edf', 'chb24_08.edf', 'chb24_10.edf',
+                       'chb24_12.edf', 'chb24_16.edf', 'chb24_18.edf', 'chb24_19.edf', 'chb24_20.edf', 'chb24_22.edf']
+    missing_records = list(map(lambda x: {x:[((None,None,None),(None,None,None))]},missing_records))
+    # using "finger" method to create new list in sorted order
+    idx1,idx2 = 0,0
+    while idx1<len(missing_records) and idx2<len(record_list):
+        # comparing end of filenames to see which record goes first
+        # i.e chb24_01 comes before chb24_02
+        name1 = list(missing_records[idx1].keys())[0]
+        name2 = list(record_list[idx2].keys())[0]
+        if int(name1[6:8]) < int(name2[6:8]):
+            # then idx1 is incremented
+            new_record_list.append(missing_records[idx1])
+            idx1 += 1
+        else:
+            new_record_list.append(record_list[idx2])
+            idx2 += 1
+    while idx1<len(missing_records):
+        new_record_list.append(missing_records[idx1])
+        idx1 += 1
+    while idx2 < len(record_list):
+        new_record_list.append(record_list[idx2])
+        idx2 += 1
+    return new_record_list
 '''
     Below is some basic logic I wrote while testing stuff
 '''
 
-#preprocess_data()
-
+preprocess_data()
 '''
 files = get_eegs()[0]
 window_test = window_recordings(files,None)[0]
