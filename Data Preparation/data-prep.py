@@ -3,10 +3,8 @@ import matplotlib.pyplot as plt
 import mne
 from pathlib import Path
 import os
-from os import path
 import pickle
 import scipy.signal as signal
-from datetime import datetime
 
 
 # chb-mit includes 23 channels sampled at 256hz
@@ -28,7 +26,11 @@ def preprocess_data(window_size=12):
         final_mapping = {}
         for summary_file in summary_files:
             # mapping should only have "chb01" not "chb01-summary.txt"
-            final_mapping[os.path.basename(summary_file)[:5]] = get_seizure_timestamps(summary_file)
+            record_list = get_seizure_timestamps(summary_file)
+            if 'chb24' in summary_file:
+                # need to generate timestamps for record_list since these are not given
+                record_list = generate_timesteps(record_list, 'chb24')
+            final_mapping[os.path.basename(summary_file)[:5]] = record_list
             # final_mapping.update(get_seizure_timestamps(summary_file))
         # combining dictionaries into 1 and then we can keep this object as a pickle object
         # writing the pickle to filesystem
@@ -78,12 +80,11 @@ def get_seizure_timestamps(summary_filepath):
 
             # IMPORTANT: CHB24 has no file start and end times, so we will need to generate those
             if 'chb24' in curr_filename:
-                file_start = (None,None,None)
-                file_end = (None,None,None)
+                file_start = (None, None, None)
+                file_end = (None, None, None)
             else:
                 file_start = (s_hour, s_min, s_sec) = [int(element) for element in file_start_elements]
                 file_end = (e_hour, e_min, e_sec) = [int(element) for element in file_end_elements]
-
 
             if len(seizure_mapping) != 0:
                 total_files.append(seizure_mapping)
@@ -108,13 +109,50 @@ def get_eegs():
     return [str(path) for path in path_list]
 
 
+# need to generate timestamps for each file in chb24 since file timestamps do not exist for this
+# we will just use the sampling rate to determine file timestamps
+# safe assumption here is that each consecutive file is immediately recorded after the last
+# the parameter here is the list of the associated patient summary processed dictionary
+# (this list includes filenames and metadata)
+def generate_timesteps(file_summary_object, patient_name):
+    start_seconds = 0
+    for i, record in enumerate(file_summary_object):
+        filename = list(record.keys())[0]
+        # reading the eeg file and excluding dummy '-' channels
+        eeg_raw = mne.io.read_raw_edf(os.path.join('.', 'Data', patient_name, filename), exclude=['-'])
+
+        # removing the redundant channel
+        eeg_raw = eeg_raw.drop_channels(['T8-P8-1']).rename_channels({'T8-P8-0': 'T8-P8'})
+
+        sampling_frequency = int(eeg_raw.info['sfreq'])
+
+        # getting data in the shape (num_channels,samples) where we sample 'sampling_frequency * seconds'
+        eeg_raw_data = eeg_raw.get_data()
+        num_samples = eeg_raw_data.shape[1]
+        # dividing samples by the sampling rate to get the time elapsed in seconds
+        seconds_elapsed = int(num_samples / sampling_frequency)
+        start_min, mod_sec = divmod(start_seconds, 60)
+        start_hour, start_min = divmod(start_min, 60)
+        start_time = (start_hour, start_min, mod_sec)
+        # incrementing start time with elapsed time
+        start_seconds += seconds_elapsed
+        end_min, mod_sec = divmod(start_seconds, 60)
+        end_hour, end_min = divmod(end_min, 60)
+        end_time = (end_hour, end_min, mod_sec)
+        # updating list
+        file_summary_object[i][filename][0] = (start_time, end_time)
+        print(file_summary_object)
+    # returning the modified file_summary_object (this should include non-NONE timestamps)
+    return file_summary_object
+
+
 # function that takes an eeg recording file and splits it into windows based on a window size and sampling frequency
 # NOTE: window size is in seconds-> number of samples will be taken care of automagically by this function
 # seizure times is the list of tuples [(start_time,end_time),(start_time_2,end_time_2),...]
 # TODO: implement tagging here
 def window_recordings(file_path, seizure_times, window_size=12):
     # reading the eeg file and excluding dummy '-' channels
-    eeg_raw = mne.io.read_raw_edf(file_path,exclude=['-'])
+    eeg_raw = mne.io.read_raw_edf(file_path, exclude=['-'])
 
     # removing the redundant channel
     eeg_raw = eeg_raw.drop_channels(['T8-P8-1']).rename_channels({'T8-P8-0': 'T8-P8'})
