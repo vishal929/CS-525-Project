@@ -112,6 +112,14 @@ def get_seizure_timestamps(summary_filepath):
 
                 start_object = datetime.datetime.strptime(str(s_hour)+':'+str(s_min)+':'+str(s_sec),'%H:%M:%S')
                 end_object = datetime.datetime.strptime(str(e_hour) + ':' + str(e_min) + ':' + str(e_sec), '%H:%M:%S')
+                # need to account for the day to avoid negative differences
+                while last_end_time is not None and start_object < last_end_time:
+                    # need to increment the day of this object by 1 i.e we are going from something like 23 hr to 2 hr
+                    start_object += datetime.timedelta(days=1)
+
+                while end_object < start_object:
+                    # need to account for wraparound, we can just increment the day of end_object by 1
+                    end_object += datetime.timedelta(days=1)
 
                 # getting timedelta in seconds
                 seconds_elapsed = int((end_object-start_object).total_seconds())
@@ -148,6 +156,14 @@ def get_eegs():
     path_list = list(eeg_paths)  # + list(seizure_paths)
     return [str(path) for path in path_list]
 
+# reading eeg data specific to chb-mit dataset
+def read_mne_data(filename):
+    # reading the eeg file and excluding dummy '-' channels
+    eeg_raw = mne.io.read_raw_edf(filename, exclude=['-'])
+
+    # removing the redundant channel
+    eeg_raw = eeg_raw.drop_channels(['T8-P8-1']).rename_channels({'T8-P8-0': 'T8-P8'})
+    return eeg_raw
 
 # need to generate timestamps for each file in chb24 since file timestamps do not exist for this
 # we will just use the sampling rate to determine file timestamps
@@ -158,12 +174,7 @@ def generate_timesteps(file_summary_object, patient_name):
     start_seconds = 0
     for i, record in enumerate(file_summary_object):
         filename = list(record.keys())[0]
-        # reading the eeg file and excluding dummy '-' channels
-        eeg_raw = mne.io.read_raw_edf(os.path.join('.', 'Data', patient_name, filename), exclude=['-'])
-
-        # removing the redundant channel
-        eeg_raw = eeg_raw.drop_channels(['T8-P8-1']).rename_channels({'T8-P8-0': 'T8-P8'})
-
+        eeg_raw = read_mne_data(os.path.join('.', 'Data', patient_name, filename))
         sampling_frequency = int(eeg_raw.info['sfreq'])
 
         # getting data in the shape (num_channels,samples) where we sample 'sampling_frequency * seconds'
@@ -195,7 +206,22 @@ def generate_timesteps(file_summary_object, patient_name):
 # we can then window and process these segments for classification
 # for comparison to other works, inter-ictal segments should be extracted at least 4 hours after or before a seizure
 def split_eeg_into_classes(patient_metadata_list):
-    pass
+    # we need to grab a list of absolute times of seizures first
+    seizure_absolutes = []
+    for file_data in patient_metadata_list:
+        time_data = file_data[file_data.keys()[0]]
+        start_sec = time_data[0][0]
+        for i in range(1,len(time_data)):
+            seizure_start_adjusted = time_data[i][0] + start_sec
+            seizure_end_adjusted = time_data[i][1] + start_sec
+            seizure_absolutes.append((seizure_start_adjusted,seizure_end_adjusted))
+
+    # now that we have seizure absolute timesteps for this patient, we can extract ictal and interictal from each file
+    # reminder, we extract all ictal data and only interictal data 4 hours before or after any seizure
+    ictal_segments = []
+    interictal_segments = []
+    for file_data in patient_metadata_list:
+        pass
 
 
 # function that takes an eeg recording file and splits it into windows based on a window size and sampling frequency
@@ -203,12 +229,7 @@ def split_eeg_into_classes(patient_metadata_list):
 # seizure times is the list of tuples [(start_time,end_time),(start_time_2,end_time_2),...]
 # TODO: implement tagging here
 def window_recordings(file_path, seizure_times, window_size=12):
-    # reading the eeg file and excluding dummy '-' channels
-    eeg_raw = mne.io.read_raw_edf(file_path, exclude=['-'])
-
-    # removing the redundant channel
-    eeg_raw = eeg_raw.drop_channels(['T8-P8-1']).rename_channels({'T8-P8-0': 'T8-P8'})
-
+    eeg_raw = read_mne_data(file_path)
     sampling_frequency = int(eeg_raw.info['sfreq'])
 
     # getting data in the shape (num_channels,samples) where we sample 'sampling_frequency * seconds'
@@ -299,7 +320,9 @@ def grab_missing_records(record_list):
     Below is some basic logic I wrote while testing stuff
 '''
 
-preprocess_data()
+patient_metadata = preprocess_data()
+test_list = patient_metadata['chb01']
+print(patient_metadata)
 '''
 files = get_eegs()[0]
 window_test = window_recordings(files,None)[0]
