@@ -5,6 +5,7 @@ from pathlib import Path
 import os
 import pickle
 import scipy.signal as signal
+import datetime
 
 
 # chb-mit includes 23 channels sampled at 256hz
@@ -43,8 +44,8 @@ def preprocess_data(window_size=12):
 
     # validating the mapping based on records file
     print('validating that all record metadata was grabbed ...')
-    missing = validate_records(os.path.join('.','Data','RECORDS'),final_mapping)
-    if len(missing) ==0:
+    missing = validate_records(os.path.join('.', 'Data', 'RECORDS'), final_mapping)
+    if len(missing) == 0:
         print('ALL RECORD METADATA VALIDATED AND SUCCESSFULLY GRABBED!')
 
     # getting the eeg data files
@@ -53,6 +54,7 @@ def preprocess_data(window_size=12):
     # we want to keep them together so we have it organized per patient
     # TODO: file processing + tagging (ideally add tagging to the window_recordings() function)
     return final_mapping
+
 
 # function that retrieves all summary text files
 def get_summary_files():
@@ -63,6 +65,9 @@ def get_summary_files():
 
 # function that gets seizure timestamps from a summary file and the associated time period
 # records should be {filename: [(file_start,file_end),(seizure_start,seizure_end),(seizure_start_2,seizure_end_2),...]}
+# we only care about absolute time (in seconds) for each patient
+# for example, the first recording should have (0,seconds_taken)
+# ... the second recording should have (start_in_seconds, start_in_seconds + seconds_taken)
 # we return a list of records for this summary filepath
 def get_seizure_timestamps(summary_filepath):
     # reading in the summary file
@@ -73,6 +78,8 @@ def get_seizure_timestamps(summary_filepath):
     total_files = []
     seizure_mapping = {}
     curr_filename = None
+    last_end_time = None
+    last_absolute_end_time = None
     for idx, line in enumerate(lines):
         line = line.lower()
         if line.startswith('file name'):
@@ -89,16 +96,40 @@ def get_seizure_timestamps(summary_filepath):
 
             # IMPORTANT: CHB24 has no file start and end times, so we will need to generate those
             if 'chb24' in curr_filename:
-                file_start = (None, None, None)
-                file_end = (None, None, None)
+                start_seconds = None
+                end_seconds = None
             else:
-                file_start = (s_hour, s_min, s_sec) = [int(element) for element in file_start_elements]
-                file_end = (e_hour, e_min, e_sec) = [int(element) for element in file_end_elements]
+                s_hour, s_min, s_sec = [int(element) for element in file_start_elements]
+                e_hour, e_min, e_sec = [int(element) for element in file_end_elements]
+
+                # need to convert to seconds
+
+                # regularization (some summary files go over 24, which python time package does not like)
+                if s_hour >= 24:
+                    s_hour -= 24
+                if e_hour >= 24:
+                    e_hour -= 24
+
+                start_object = datetime.datetime.strptime(str(s_hour)+':'+str(s_min)+':'+str(s_sec),'%H:%M:%S')
+                end_object = datetime.datetime.strptime(str(e_hour) + ':' + str(e_min) + ':' + str(e_sec), '%H:%M:%S')
+
+                # getting timedelta in seconds
+                seconds_elapsed = int((end_object-start_object).total_seconds())
+                if last_end_time is None:
+                    start_seconds = 0
+                    end_seconds = seconds_elapsed
+                else:
+                    seconds_elapsed_between_files = int((start_object-last_end_time).total_seconds())
+                    start_seconds = last_absolute_end_time + seconds_elapsed_between_files
+                    end_seconds = start_seconds + seconds_elapsed
+                last_end_time = end_object
+                last_absolute_end_time = end_seconds
+
 
             if len(seizure_mapping) != 0:
                 total_files.append(seizure_mapping)
                 seizure_mapping = {}
-            seizure_mapping[curr_filename] = [(file_start, file_end)]
+            seizure_mapping[curr_filename] = [(start_seconds, end_seconds)]
         if line.startswith('seizure start time'):
             # the next line will be the seizure end time
             seizure_start_time = int(line.split(':')[1].split()[0])
@@ -140,19 +171,31 @@ def generate_timesteps(file_summary_object, patient_name):
         num_samples = eeg_raw_data.shape[1]
         # dividing samples by the sampling rate to get the time elapsed in seconds
         seconds_elapsed = int(num_samples / sampling_frequency)
+        start_time = start_seconds
+        '''
         start_min, mod_sec = divmod(start_seconds, 60)
         start_hour, start_min = divmod(start_min, 60)
         start_time = (start_hour, start_min, mod_sec)
+        '''
         # incrementing start time with elapsed time
         start_seconds += seconds_elapsed
+        end_time = start_seconds
+        '''
         end_min, mod_sec = divmod(start_seconds, 60)
         end_hour, end_min = divmod(end_min, 60)
         end_time = (end_hour, end_min, mod_sec)
+        '''
         # updating list
         file_summary_object[i][filename][0] = (start_time, end_time)
-        print(file_summary_object)
     # returning the modified file_summary_object (this should include non-NONE timestamps)
     return file_summary_object
+
+
+# need to grab data for a patient and split it into ictal and inter-ictal segments
+# we can then window and process these segments for classification
+# for comparison to other works, inter-ictal segments should be extracted at least 4 hours after or before a seizure
+def split_eeg_into_classes(patient_metadata_list):
+    pass
 
 
 # function that takes an eeg recording file and splits it into windows based on a window size and sampling frequency
@@ -200,10 +243,11 @@ def stft_recordings(eeg_data, sampling_frequency=256, window=256, overlap=None):
     frequencies = np.delete(frequencies, [0, *[i for i in range(57, 64, 1)], *[i for i in range(117, 124, 1)]], axis=1)
     return frequencies
 
+
 # function that validates whether we have grabbed all records
 # this returns a list of records which are provided in the dataset for chb-mit, but we haven't grabbed
 # ideally, this list should be empty
-def validate_records(record_list_path,summary_dictionary):
+def validate_records(record_list_path, summary_dictionary):
     missed_records = []
     # getting all record names in the summary dictionary first
     record_names = {}
@@ -211,13 +255,14 @@ def validate_records(record_list_path,summary_dictionary):
         for record in summary_dictionary[patient_name]:
             edf_file = list(record.keys())[0]
             record_names[edf_file] = 1
-    file = open(record_list_path,'r')
+    file = open(record_list_path, 'r')
     edf_file_list = file.readlines()
     for filename in edf_file_list:
         filename = os.path.basename(filename.strip())
         if filename not in record_names:
-           missed_records.append(filename)
+            missed_records.append(filename)
     return missed_records
+
 
 # the only missing records is in patient 24 due to annotators not putting all data in the summary file
 # so, we need to add these records to the processed summary dictionary
@@ -226,10 +271,10 @@ def grab_missing_records(record_list):
     new_record_list = []
     missing_records = ['chb24_02.edf', 'chb24_05.edf', 'chb24_08.edf', 'chb24_10.edf',
                        'chb24_12.edf', 'chb24_16.edf', 'chb24_18.edf', 'chb24_19.edf', 'chb24_20.edf', 'chb24_22.edf']
-    missing_records = list(map(lambda x: {x:[((None,None,None),(None,None,None))]},missing_records))
+    missing_records = list(map(lambda x: {x: [((None, None, None), (None, None, None))]}, missing_records))
     # using "finger" method to create new list in sorted order
-    idx1,idx2 = 0,0
-    while idx1<len(missing_records) and idx2<len(record_list):
+    idx1, idx2 = 0, 0
+    while idx1 < len(missing_records) and idx2 < len(record_list):
         # comparing end of filenames to see which record goes first
         # i.e chb24_01 comes before chb24_02
         name1 = list(missing_records[idx1].keys())[0]
@@ -241,13 +286,15 @@ def grab_missing_records(record_list):
         else:
             new_record_list.append(record_list[idx2])
             idx2 += 1
-    while idx1<len(missing_records):
+    while idx1 < len(missing_records):
         new_record_list.append(missing_records[idx1])
         idx1 += 1
     while idx2 < len(record_list):
         new_record_list.append(record_list[idx2])
         idx2 += 1
     return new_record_list
+
+
 '''
     Below is some basic logic I wrote while testing stuff
 '''
