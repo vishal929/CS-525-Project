@@ -56,8 +56,6 @@ def preprocess_metadata():
 def process_data(window_size=1):
     metadata = preprocess_metadata()
     for patient in metadata:
-        if 'chb06' not in patient:
-            continue
         # getting patient id, like 'chb01' or 'chb02'
         patient_id = os.path.basename(patient)
         patient_files = metadata[patient]
@@ -81,10 +79,20 @@ def process_data(window_size=1):
 
         # most of our values have around 9 digits of precision and exponent around -05 to -08, so float32 is all we need
         # saving ictal data to disk (we are saving as float32, float64 is going to be worse in our case
+
         ictal_train = np.concatenate(ictal_train,axis=0,dtype=np.float32)
+        # 22 channels
+        assert ictal_train.shape[1] == 22
+        # 114 frequencies in frequency domain
+        assert ictal_train.shape[2] == 114
         np.save(os.path.join('.','Processed_Data',patient_id,str(window_size)+'-ictal_train.npy'),ictal_train)
         del ictal_train
+
         ictal_val = np.concatenate(ictal_val,axis=0,dtype=np.float32)
+        # 22 channels
+        assert ictal_val.shape[1] == 22
+        # 114 frequencies in frequency domain
+        assert ictal_val.shape[2] == 114
         np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size)+'-ictal_val.npy'), ictal_val)
         del ictal_val
 
@@ -98,11 +106,21 @@ def process_data(window_size=1):
             # adding to data pool
             interictal_train.append(train)
             interictal_val.append(val)
+
         # saving interictal to disk (saving as float32 type)
         interictal_train = np.concatenate(interictal_train,axis=0,dtype=np.float32)
+        # 22 channels
+        assert interictal_train.shape[1] == 22
+        # 114 frequencies in frequency domain
+        assert interictal_train.shape[2] == 114
         np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size)+'-interictal_train.npy'), interictal_train)
         del interictal_train
+
         interictal_val = np.concatenate(interictal_val,axis=0,dtype=np.float32)
+        # 22 channels
+        assert interictal_val.shape[1] == 22
+        # 114 frequencies in frequency domain
+        assert interictal_val.shape[2] == 114
         np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size)+'-interictal_val.npy'), interictal_val)
         del interictal_val
 
@@ -209,8 +227,14 @@ def get_eegs():
 
 # reading eeg data specific to chb-mit dataset
 def read_mne_data(filename):
+    # we need to standardize the channels we want to grab
+    channels = ['FP1-F7','F7-T7','T7-P7','P7-O1','FP1-F3','F3-C3','C3-P3',
+               'P3-O1','FP2-F4','F4-C4','C4-P4','P4-O2',
+               'FP2-F8','F8-T8','T8-P8','P8-O2,','FZ-CZ',
+               'CZ-PZ','P7-T7','T7-FT9','FT9-FT10','FT10-T8']
     # reading the eeg file and excluding dummy '-' channels and 'ECG' Channels (not all patients have ECG recordings)
-    eeg_raw = mne.io.read_raw_edf(filename, exclude=['-','ECG'])
+    #eeg_raw = mne.io.read_raw_edf(filename, exclude=['-','ECG'])
+    eeg_raw = mne.io.read_raw_edf(filename, include=channels)
 
     # removing the redundant channel
     eeg_raw = eeg_raw.drop_channels(['T8-P8-1']).rename_channels({'T8-P8-0': 'T8-P8'})
