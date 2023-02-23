@@ -11,7 +11,7 @@ import datetime
 # chb-mit includes 23 channels sampled at 256hz
 
 # parent function to preprocess data in the Data directory for some given window size
-def preprocess_data(window_size=12):
+def preprocess_metadata():
     # checking if summary pickle exists
     if Path.exists(Path('./Processed_Data/summary.pickle')):
         # load the pickle
@@ -34,7 +34,7 @@ def preprocess_data(window_size=12):
                 # need to generate timestamps for record_list since these are not given
                 record_list = generate_timesteps(record_list, 'chb24')
             final_mapping[os.path.dirname(summary_file)] = record_list
-            #final_mapping[os.path.basename(summary_file)[:5]] = record_list
+            # final_mapping[os.path.basename(summary_file)[:5]] = record_list
             # final_mapping.update(get_seizure_timestamps(summary_file))
         # combining dictionaries into 1 and then we can keep this object as a pickle object
         # writing the pickle to filesystem
@@ -49,12 +49,30 @@ def preprocess_data(window_size=12):
     if len(missing) == 0:
         print('ALL RECORD METADATA VALIDATED AND SUCCESSFULLY GRABBED!')
 
-    # getting the eeg data files
-    eeg_files = get_eegs()
-    # we only want to process eeg data one summary file at a time
-    # we want to keep them together so we have it organized per patient
-    # TODO: file processing + tagging (ideally add tagging to the window_recordings() function)
     return final_mapping
+
+
+# function that processes,tags, and splits data eeg data for seizure classification based on processed metadata
+def process_data(metadata,window_size=1):
+    for patient in metadata:
+        # getting patient id, like 'chb01' or 'chb02'
+        patient_id = os.path.basename(patient)
+        patient_files = metadata[patient_id]
+        ictal, interictal = split_eeg_into_classes(patient_files,patient)
+        for segment in ictal:
+            # we want to window this segment, run short fourier transform and send to train/val
+            # the latter 25% are sent to validation
+            windows = window_recordings(segment,window_size=window_size)
+            train,val = None
+            train,val = stft_recordings(train),stft_recordings(val)
+            # saving these to disk
+        for segment in interictal:
+            # the latter 25% are sent to validation
+            # we want to window this segment, run short fourier transform and send to train/val
+            windows = window_recordings(segment,window_size=window_size)
+            train,val = None
+            train,val = stft_recordings(train),stft_recordings(val)
+            # saving these to disk
 
 
 # function that retrieves all summary text files
@@ -111,7 +129,7 @@ def get_seizure_timestamps(summary_filepath):
                 if e_hour >= 24:
                     e_hour -= 24
 
-                start_object = datetime.datetime.strptime(str(s_hour)+':'+str(s_min)+':'+str(s_sec),'%H:%M:%S')
+                start_object = datetime.datetime.strptime(str(s_hour) + ':' + str(s_min) + ':' + str(s_sec), '%H:%M:%S')
                 end_object = datetime.datetime.strptime(str(e_hour) + ':' + str(e_min) + ':' + str(e_sec), '%H:%M:%S')
                 # need to account for the day to avoid negative differences
                 while last_end_time is not None and start_object < last_end_time:
@@ -123,17 +141,16 @@ def get_seizure_timestamps(summary_filepath):
                     end_object += datetime.timedelta(days=1)
 
                 # getting timedelta in seconds
-                seconds_elapsed = int((end_object-start_object).total_seconds())
+                seconds_elapsed = int((end_object - start_object).total_seconds())
                 if last_end_time is None:
                     start_seconds = 0
                     end_seconds = seconds_elapsed
                 else:
-                    seconds_elapsed_between_files = int((start_object-last_end_time).total_seconds())
+                    seconds_elapsed_between_files = int((start_object - last_end_time).total_seconds())
                     start_seconds = last_absolute_end_time + seconds_elapsed_between_files
                     end_seconds = start_seconds + seconds_elapsed
                 last_end_time = end_object
                 last_absolute_end_time = end_seconds
-
 
             if len(seizure_mapping) != 0:
                 total_files.append(seizure_mapping)
@@ -157,6 +174,7 @@ def get_eegs():
     path_list = list(eeg_paths)  # + list(seizure_paths)
     return [str(path) for path in path_list]
 
+
 # reading eeg data specific to chb-mit dataset
 def read_mne_data(filename):
     # reading the eeg file and excluding dummy '-' channels
@@ -165,6 +183,7 @@ def read_mne_data(filename):
     # removing the redundant channel
     eeg_raw = eeg_raw.drop_channels(['T8-P8-1']).rename_channels({'T8-P8-0': 'T8-P8'})
     return eeg_raw
+
 
 # need to generate timestamps for each file in chb24 since file timestamps do not exist for this
 # we will just use the sampling rate to determine file timestamps
@@ -207,17 +226,17 @@ def generate_timesteps(file_summary_object, patient_name):
 # we can then window and process these segments for classification
 # for comparison to other works, inter-ictal segments should be extracted at least 4 hours after or before a seizure
 # par_path is the path of the patient directory associated with the metadata list (i.e './Data/chb01/)
-def split_eeg_into_classes(patient_metadata_list,par_path):
+def split_eeg_into_classes(patient_metadata_list, par_path):
     # we need to grab a list of absolute times of seizures first
     seizure_absolutes = []
     for file_data in patient_metadata_list:
         time_data = file_data[list(file_data.keys())[0]]
         start_sec = time_data[0][0]
-        for i in range(1,len(time_data)):
+        for i in range(1, len(time_data)):
             seizure_start_adjusted = time_data[i][0] + start_sec
             seizure_end_adjusted = time_data[i][1] + start_sec
-            seizure_absolutes.append((seizure_start_adjusted,seizure_end_adjusted))
-    #print(len(seizure_absolutes))
+            seizure_absolutes.append((seizure_start_adjusted, seizure_end_adjusted))
+    # print(len(seizure_absolutes))
     # creating a dictionary of invalid timesteps for quick lookup
     # 4 hours is 14400 seconds
     invalid_times = set([])
@@ -225,9 +244,9 @@ def split_eeg_into_classes(patient_metadata_list,par_path):
         seizure_start = seizure[0]
         seizure_end = seizure[1]
         # invalid range is not inclusive
-        invalid = np.arange(seizure_start-14400+1,seizure_end+14400-1)
+        invalid = np.arange(seizure_start - 14400 + 1, seizure_end + 14400 - 1)
         invalid_times.update(set(invalid))
-    #print(len(invalid_times))
+    # print(len(invalid_times))
 
     print('invalid times set created!')
     # now that we have seizure absolute timesteps for this patient, we can extract ictal and interictal from each file
@@ -238,46 +257,47 @@ def split_eeg_into_classes(patient_metadata_list,par_path):
     # we will assume that a patient had a seizure immediately before the eeg recording session to ensure data conditions
     for file_data in patient_metadata_list:
         file_name = list(file_data.keys())[0]
-        file_path = os.path.join(par_path,file_name)
+        file_path = os.path.join(par_path, file_name)
         time_data = file_data[file_name]
         start_sec = time_data[0][0]
         end_sec = time_data[0][1]
         # 4 hours is 14400 seconds
         # getting any seizure data first if it exists
-        for i in range(1,len(time_data)):
+        for i in range(1, len(time_data)):
             # extracting ictal sections
-            ictal_segments.append(extract_section(file_path,time_data[i]))
+            ictal_segments.append(extract_section(file_path, time_data[i]))
 
-        curr_range = (None,None)
-        total_range = np.arange(start_sec,end_sec+1)
+        curr_range = (None, None)
+        total_range = np.arange(start_sec, end_sec + 1)
         for idx, i in enumerate(total_range):
             # creating a range of values that are valid
             if i not in invalid_times:
                 if curr_range[0] is None:
-                    curr_range = (idx,None)
+                    curr_range = (idx, None)
                 else:
-                    curr_range = (curr_range[0],idx)
+                    curr_range = (curr_range[0], idx)
             else:
                 # then we hit an invalid timestep
                 if curr_range[0] is not None and curr_range[1] is not None:
-                    interictal_segments.append(extract_section(file_path,curr_range))
-                curr_range = (None,None)
+                    interictal_segments.append(extract_section(file_path, curr_range))
+                curr_range = (None, None)
         if curr_range[0] is not None and curr_range[1] is not None:
-            interictal_segments.append(extract_section(file_path,curr_range))
-    return ictal_segments,interictal_segments
+            interictal_segments.append(extract_section(file_path, curr_range))
+    return ictal_segments, interictal_segments
 
 
 # function that extracts numpy array of an eeg section given a .edf filename and a tuple of (start,end)
-def extract_section(file_path,start_end):
+def extract_section(file_path, start_end):
     raw_eeg = read_mne_data(file_path)
     sampling_rate = int(raw_eeg.info['sfreq'])
     data = raw_eeg.get_data()
     # data is in shape (num_channels,samples)
-    return data[:,sampling_rate*start_end[0]:sampling_rate*start_end[1]]
+    return data[:, sampling_rate * start_end[0]:sampling_rate * start_end[1]]
+
 
 # function that takes an eeg numpy array and splits it into windows based on the window size
 # NOTE: window size is in seconds-> number of samples will be taken care of automagically by this function
-def window_recordings(eeg_raw_data, sampling_frequency = 256, window_size=12):
+def window_recordings(eeg_raw_data, sampling_frequency=256, window_size=12):
     # windowing based on window_size and sampling frequency
     total_samples = eeg_raw_data.shape[1]
     curr_window = 0
@@ -298,13 +318,17 @@ def window_recordings(eeg_raw_data, sampling_frequency = 256, window_size=12):
 
 # function that takes an eeg window, and applies the short term fourier transform with window and overlap parameters
 # we filter out noise frequency and DC frequency specific to the CHB-MIT scalp EEG dataset
+# this function can take a batch of eeg windows as long as the batch is the first dimension
 def stft_recordings(eeg_window, sampling_frequency=256, window=256, overlap=None):
     # applying stft to data
-    _, _, frequencies = signal.stft(eeg_window, fs=sampling_frequency, nperseg=256, noverlap=overlap)
+    _, _, frequencies = signal.stft(eeg_window, fs=sampling_frequency, nperseg=window, noverlap=overlap)
     # removing the start and end times to be consistent with the paper
-    frequencies = frequencies[:, :, 1:-1]
+
+    frequencies = np.delete(frequencies,[0,len(frequencies)-1],axis=-1)
+    #frequencies = frequencies[:, :, 1:-1]
+
     # removing DC component (0 Hz), the 57-63Hz and 117-123Hz bands (specific for chb-mit dataset)
-    frequencies = np.delete(frequencies, [0, *[i for i in range(57, 64, 1)], *[i for i in range(117, 124, 1)]], axis=1)
+    frequencies = np.delete(frequencies, [0, *[i for i in range(57, 64, 1)], *[i for i in range(117, 124, 1)]], axis=-2)
     return frequencies
 
 
@@ -319,6 +343,9 @@ def validate_records(record_list_path, summary_dictionary):
         for record in summary_dictionary[patient_name]:
             edf_file = list(record.keys())[0]
             record_names[edf_file] = 1
+            # sanity check that our times make sense as well (are positive)
+            for time_tuple in record[edf_file]:
+                assert (time_tuple[0] >= 0 and time_tuple[1] >= 0)
     file = open(record_list_path, 'r')
     edf_file_list = file.readlines()
     for filename in edf_file_list:
@@ -363,7 +390,8 @@ def grab_missing_records(record_list):
     Below is some basic logic I wrote while testing stuff
 '''
 
-patient_metadata = preprocess_data()
+
+'''
 picked_key = list(patient_metadata.keys())[0]
 print(picked_key)
 test_list = patient_metadata[picked_key]
@@ -372,6 +400,8 @@ ictals,interictals = split_eeg_into_classes(test_list,picked_key)
 print(len(ictals))
 print(len(interictals))
 #extract_ictal_section('./Data/chb01/chb01_01.edf','dummy')
+'''
+
 '''
 files = get_eegs()[0]
 window_test = window_recordings(files,None)[0]
