@@ -207,8 +207,8 @@ def get_eegs():
 
 # reading eeg data specific to chb-mit dataset
 def read_mne_data(filename):
-    # reading the eeg file and excluding dummy '-' channels
-    eeg_raw = mne.io.read_raw_edf(filename, exclude=['-'])
+    # reading the eeg file and excluding dummy '-' channels and 'ECG' Channels (not all patients have ECG recordings)
+    eeg_raw = mne.io.read_raw_edf(filename, exclude=['-','ECG'])
 
     # removing the redundant channel
     eeg_raw = eeg_raw.drop_channels(['T8-P8-1']).rename_channels({'T8-P8-0': 'T8-P8'})
