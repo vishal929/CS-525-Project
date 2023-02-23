@@ -56,6 +56,8 @@ def preprocess_metadata():
 def process_data(window_size=1):
     metadata = preprocess_metadata()
     for patient in metadata:
+        if 'chb06' not in patient:
+            continue
         # getting patient id, like 'chb01' or 'chb02'
         patient_id = os.path.basename(patient)
         patient_files = metadata[patient]
@@ -78,7 +80,7 @@ def process_data(window_size=1):
             os.mkdir(os.path.join('.','Processed_Data',patient_id))
 
         # most of our values have around 9 digits of precision and exponent around -05 to -08, so float32 is all we need
-        # saving ictal data to disk (we are saving as float32, float64 is going to be worse in our case)
+        # saving ictal data to disk (we are saving as float32, float64 is going to be worse in our case
         ictal_train = np.concatenate(ictal_train,axis=0,dtype=np.float32)
         np.save(os.path.join('.','Processed_Data',patient_id,str(window_size)+'-ictal_train.npy'),ictal_train)
         del ictal_train
@@ -186,7 +188,7 @@ def get_seizure_timestamps(summary_filepath):
                 total_files.append(seizure_mapping)
                 seizure_mapping = {}
             seizure_mapping[curr_filename] = [(start_seconds, end_seconds)]
-        if line.startswith('seizure start time'):
+        if 'seizure' in line and 'start' in line:
             # the next line will be the seizure end time
             seizure_start_time = int(line.split(':')[1].split()[0])
             seizure_end_time = int(lines[idx + 1].split(':')[1].split()[0])
