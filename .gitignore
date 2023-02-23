@@ -1,0 +1,3 @@
+#ignore Data files
+Data Preparation/Data/*
+Data Preparation/Processed_Data/*
