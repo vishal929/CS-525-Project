@@ -53,26 +53,56 @@ def preprocess_metadata():
 
 
 # function that processes,tags, and splits data eeg data for seizure classification based on processed metadata
-def process_data(metadata,window_size=1):
+def process_data(window_size=1):
+    metadata = preprocess_metadata()
     for patient in metadata:
         # getting patient id, like 'chb01' or 'chb02'
         patient_id = os.path.basename(patient)
-        patient_files = metadata[patient_id]
+        patient_files = metadata[patient]
         ictal, interictal = split_eeg_into_classes(patient_files,patient)
+        ictal_train,ictal_val = [],[]
+        interictal_train, interictal_val = [],[]
         for segment in ictal:
             # we want to window this segment, run short fourier transform and send to train/val
             # the latter 25% are sent to validation
             windows = window_recordings(segment,window_size=window_size)
-            train,val = None
+            # 75% sent to train, 25% sent to validation
+            train,val = np.split(windows,[int(len(windows)*0.75)])
             train,val = stft_recordings(train),stft_recordings(val)
-            # saving these to disk
+            # adding to data pool
+            ictal_train.append(train)
+            ictal_val.append(val)
+
+        # need to create directory if it doesnt already exist
+        if not os.path.isdir(os.path.join('.','Processed_Data',patient_id)):
+            os.mkdir(os.path.join('.','Processed_Data',patient_id))
+
+        # most of our values have around 9 digits of precision and exponent around -05 to -08, so float32 is all we need
+        # saving ictal data to disk (we are saving as float32, float64 is going to be worse in our case)
+        ictal_train = np.concatenate(ictal_train,axis=0,dtype=np.float32)
+        np.save(os.path.join('.','Processed_Data',patient_id,str(window_size)+'-ictal_train.npy'),ictal_train)
+        del ictal_train
+        ictal_val = np.concatenate(ictal_val,axis=0,dtype=np.float32)
+        np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size)+'-ictal_val.npy'), ictal_val)
+        del ictal_val
+
         for segment in interictal:
             # the latter 25% are sent to validation
             # we want to window this segment, run short fourier transform and send to train/val
             windows = window_recordings(segment,window_size=window_size)
-            train,val = None
+            train,val = np.split(windows,[int(len(windows)*0.75)])
+
             train,val = stft_recordings(train),stft_recordings(val)
-            # saving these to disk
+            # adding to data pool
+            interictal_train.append(train)
+            interictal_val.append(val)
+        # saving interictal to disk (saving as float32 type)
+        interictal_train = np.concatenate(interictal_train,axis=0,dtype=np.float32)
+        np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size)+'-interictal_train.npy'), interictal_train)
+        del interictal_train
+        interictal_val = np.concatenate(interictal_val,axis=0,dtype=np.float32)
+        np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size)+'-interictal_val.npy'), interictal_val)
+        del interictal_val
 
 
 # function that retrieves all summary text files
@@ -248,13 +278,11 @@ def split_eeg_into_classes(patient_metadata_list, par_path):
         invalid_times.update(set(invalid))
     # print(len(invalid_times))
 
-    print('invalid times set created!')
+    #print('invalid times set created!')
     # now that we have seizure absolute timesteps for this patient, we can extract ictal and interictal from each file
     # reminder, we extract all ictal data and only interictal data 4 hours before or after any seizure
     ictal_segments = []
     interictal_segments = []
-    # need to keep track of last seizure time as well
-    # we will assume that a patient had a seizure immediately before the eeg recording session to ensure data conditions
     for file_data in patient_metadata_list:
         file_name = list(file_data.keys())[0]
         file_path = os.path.join(par_path, file_name)
@@ -313,7 +341,7 @@ def window_recordings(eeg_raw_data, sampling_frequency=256, window_size=12):
         curr_window += sampling_frequency
 
     # returning an array of windows
-    return new_data
+    return np.array(new_data)
 
 
 # function that takes an eeg window, and applies the short term fourier transform with window and overlap parameters
@@ -322,13 +350,16 @@ def window_recordings(eeg_raw_data, sampling_frequency=256, window_size=12):
 def stft_recordings(eeg_window, sampling_frequency=256, window=256, overlap=None):
     # applying stft to data
     _, _, frequencies = signal.stft(eeg_window, fs=sampling_frequency, nperseg=window, noverlap=overlap)
-    # removing the start and end times to be consistent with the paper
-
-    frequencies = np.delete(frequencies,[0,len(frequencies)-1],axis=-1)
+    # removing the start and end times from the time dimension (last dimension) to be consistent with the paper
+    frequencies = np.delete(frequencies,[0,frequencies.shape[len(frequencies.shape)-1]-1],axis=-1)
     #frequencies = frequencies[:, :, 1:-1]
 
     # removing DC component (0 Hz), the 57-63Hz and 117-123Hz bands (specific for chb-mit dataset)
     frequencies = np.delete(frequencies, [0, *[i for i in range(57, 64, 1)], *[i for i in range(117, 124, 1)]], axis=-2)
+
+    # stft returns complex numbers, so we use np.abs to obtain their magnitude
+    frequencies = np.abs(frequencies)
+
     return frequencies
 
 
@@ -390,6 +421,7 @@ def grab_missing_records(record_list):
     Below is some basic logic I wrote while testing stuff
 '''
 
+process_data()
 
 '''
 picked_key = list(patient_metadata.keys())[0]
