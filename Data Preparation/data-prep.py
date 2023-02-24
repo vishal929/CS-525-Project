@@ -56,8 +56,8 @@ def preprocess_metadata():
 def process_data(window_size=1):
     metadata = preprocess_metadata()
     for patient in metadata:
-        # patient 12 should be omitted due to no valid interictal data
-        if 'chb12' in patient:
+        # patient 12 and 24 should be omitted due to no valid interictal data
+        if 'chb12' in patient or 'chb24' in patient:
             continue
         # getting patient id, like 'chb01' or 'chb02'
         patient_id = os.path.basename(patient)
@@ -240,7 +240,6 @@ def read_mne_data(filename):
 
     # reading the eeg file and excluding dummy '-' channels and 'ECG' Channels (not all patients have ECG recordings)
     eeg_raw = mne.io.read_raw_edf(filename, include=channels)
-    print(eeg_raw.info['ch_names'])
 
     # removing the redundant channel
     if 'T8-P8-1' in eeg_raw.info['ch_names']:
@@ -343,7 +342,10 @@ def split_eeg_into_classes(patient_metadata_list, par_path):
             else:
                 # then we hit an invalid timestep
                 if curr_range[0] is not None and curr_range[1] is not None:
-                    interictal_segments.append(extract_section(file_path, curr_range))
+                    interictal = extract_section(file_path, curr_range)
+                    # interictal may be none if the file has invalid channels (not like the rest)
+                    if interictal is not None:
+                        interictal_segments.append(interictal)
                 curr_range = (None, None)
         if curr_range[0] is not None and curr_range[1] is not None:
             # interictal may be none if the edf file has different channels than the ones we are looking for (invalid data)
@@ -363,7 +365,11 @@ def extract_section(file_path, start_end):
         # we may get value error with invalid channel types (edf recording is not like the other recordings)
         return None
     # data is in shape (num_channels,samples)
-    return data[:, sampling_rate * start_end[0]:sampling_rate * start_end[1]]
+    final_data = data[:, sampling_rate * start_end[0]:sampling_rate * start_end[1]]
+    # channel check for invalid data
+    if final_data.shape[0] !=22:
+        return None
+    return final_data
 
 
 # function that takes an eeg numpy array and splits it into windows based on the window size
