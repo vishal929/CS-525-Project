@@ -59,6 +59,9 @@ def process_data(window_size=1):
         # patient 12 and 24 should be omitted due to no valid interictal data
         if 'chb12' in patient or 'chb24' in patient:
             continue
+        # window size 12 comparisons exclude patient 16
+        if window_size == 12 and 'chb16' in patient:
+            continue
         # getting patient id, like 'chb01' or 'chb02'
         patient_id = os.path.basename(patient)
         patient_files = metadata[patient]
@@ -69,6 +72,9 @@ def process_data(window_size=1):
             # we want to window this segment, run short fourier transform and send to train/val
             # the latter 25% are sent to validation
             windows = window_recordings(segment, window_size=window_size)
+            if windows.shape[0] == 0:
+                # empty array (window size is larger than the segment)
+                continue
             # 75% sent to train, 25% sent to validation
             train, val = np.split(windows, [int(len(windows) * 0.75)])
             train, val = stft_recordings(train), stft_recordings(val)
@@ -103,6 +109,9 @@ def process_data(window_size=1):
             # the latter 25% are sent to validation
             # we want to window this segment, run short fourier transform and send to train/val
             windows = window_recordings(segment, window_size=window_size)
+            if windows.shape[0] == 0:
+                # empty array (window size is larger than the segment)
+                continue
             train, val = np.split(windows, [int(len(windows) * 0.75)])
 
             train, val = stft_recordings(train), stft_recordings(val)
@@ -470,68 +479,4 @@ def grab_missing_records(record_list):
     Below is some basic logic I wrote while testing stuff
 '''
 
-process_data()
-
-'''
-picked_key = list(patient_metadata.keys())[0]
-print(picked_key)
-test_list = patient_metadata[picked_key]
-print(test_list)
-ictals,interictals = split_eeg_into_classes(test_list,picked_key)
-print(len(ictals))
-print(len(interictals))
-#extract_ictal_section('./Data/chb01/chb01_01.edf','dummy')
-'''
-
-'''
-files = get_eegs()[0]
-window_test = window_recordings(files,None)[0]
-test_fft = stft_recordings(window_test)
-print(test_fft.shape)
-'''
-
-'''
-# read in an edf file
-test = mne.io.read_raw_edf('./Data/chb14/chb14_01.edf',exclude=['-'])
-print(test.info)
-print(test.info['ch_names'])
-
-# WE HAVE A DUPLICATE CHANNEL!
-# it seems this is why the research paper mentions 22 channels but the info specifies 23 ...
-# why do they do this :(
-print(np.array_equal(test['T8-P8-1'][0],test['T8-P8-0'][0],equal_nan=True))
-print(np.array_equal(test['T8-P8-1'][1],test['T8-P8-0'][1],equal_nan=True))
-
-# dropping a channel from test
-test = test.drop_channels(['T8-P8-1']).rename_channels({'T8-P8-0': 'T8-P8'})
-print(test.info['ch_names'])
-
-#test.plot(duration=5, n_channels=23,show=False)
-#plt.show()
-
-test_data = test.get_data()
-
-# we have num_channels x samples
-# we have a sampling rate of 256 samples a second
-# shape is (22,921600) for chb01_01.edf
-print(test_data.shape)
-
-# getting 12 seconds of data based on sampling rate of 256 samples a second
-test_data = test_data[:,:256*12]
-print(test_data.shape)
-
-# short time fast fourier transform
-#test_fft = mne.time_frequency.stft(test_data,wsize=256)
-f,t,test_fft = signal.stft(test_data,256)
-print(f)
-print(t)
-print(test_fft.shape)
-# (22,129,7200)
-# 22 channels, 129 frequencies (0 to 128), and 7200 timesteps by shifting half a window each time
-print(test_fft.shape)
-
-# removing DC component (0 Hz), the 57-63Hz and 117-123Hz bands
-test_fft = np.delete(test_fft,[0,*[i for i in range(57,64,1)],*[i for i in range(117,124,1)]],axis=1)
-
-print(test_fft.shape)
-'''
+process_data(window_size=12)
