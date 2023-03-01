@@ -107,10 +107,11 @@ def process_data(window_size=1):
                 # 114 frequencies in frequency domain
                 assert ictal_train.shape[2] == 114
                 train_save_count += 1
-                np.savez_compressed(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-'+str(train_save_count)+'-ictal_train.npy'),
+                np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-'+str(train_save_count)+'-ictal_train.npy'),
                         ictal_train)
                 # resetting
                 ictal_train = []
+                num_train_processed=0
 
             if num_val_processed > save_threshold or len(ictal)==0:
                 # we should save this array
@@ -120,11 +121,12 @@ def process_data(window_size=1):
                 # 114 frequencies in frequency domain
                 assert ictal_val.shape[2] == 114
                 val_save_count += 1
-                np.savez_compressed(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-' + str(val_save_count) \
+                np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-' + str(val_save_count) \
                                      + '-ictal_val.npy'),
                         ictal_val)
                 # resetting
                 ictal_val = []
+                num_val_processed=0
 
         # most of our values have around 9 digits of precision and exponent around -05 to -08, so float32 is all we need
         # saving ictal data to disk (we are saving as float32, float64 is going to be worse in our case
@@ -160,11 +162,12 @@ def process_data(window_size=1):
                 # 114 frequencies in frequency domain
                 assert interictal_train.shape[2] == 114
                 train_save_count += 1
-                np.savez_compressed(os.path.join('.', 'Processed_Data', patient_id,
+                np.save(os.path.join('.', 'Processed_Data', patient_id,
                                      str(window_size) + '-' + str(train_save_count) + '-interictal_train.npy'),
                         interictal_train)
                 # resetting
                 interictal_train = []
+                num_train_processed=0
 
             if num_val_processed > save_threshold or len(interictal) == 0:
                 # we should save this array
@@ -174,11 +177,12 @@ def process_data(window_size=1):
                 # 114 frequencies in frequency domain
                 assert interictal_val.shape[2] == 114
                 val_save_count += 1
-                np.savez_compressed(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-' + str(val_save_count) \
+                np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-' + str(val_save_count) \
                                      + '-interictal_val.npy'),
                         interictal_val)
                 # resetting
                 interictal_val = []
+                num_val_processed=0
 
 
 # function that retrieves all summary text files
