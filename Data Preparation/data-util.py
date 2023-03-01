@@ -78,7 +78,16 @@ def tf_dataset(split='train',window_size=1,leave_out='chb01'):
     if split not in {'test','val','train'}:
         raise Exception('split provided is not one of train,test, or val')
     if split != 'test':
+        # need to grab data and filter out any data relating to the leave out patient
         dataset = tf.data.Dataset.list_files('./Processed_Data/*/'+str(window_size)+'-'+'*'+split+'.npy')
+        dataset_list = list(dataset)
+        filtered_list = []
+        for data in dataset_list:
+            raw = data.numpy()
+            if leave_out not in str(raw):
+                filtered_list.append(raw)
+        filtered_list = np.array(filtered_list)
+        dataset = tf.data.Dataset.from_tensor_slices(filtered_list)
     else:
         # we want the entire data for patient chb01 in this case for testing
         dataset = tf.data.Dataset.list_files('./Processed_Data/'+leave_out+'/'+str(window_size)+'*.npy')
