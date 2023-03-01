@@ -74,6 +74,9 @@ def npy_to_tf(filename):
 # we specify a patient to leave out i.e if we specify 'chb01' then patient 1 is not included in train or val
 # # this patient will be included in the test set
 def tf_dataset(split='train',window_size=1,leave_out='chb01'):
+    split = split.strip().lower()
+    if split not in {'test','val','train'}:
+        raise Exception('split provided is not one of train,test, or val')
     if split != 'test':
         dataset = tf.data.Dataset.list_files('./Processed_Data/*/'+str(window_size)+'-'+'*'+split+'.npy')
     else:
