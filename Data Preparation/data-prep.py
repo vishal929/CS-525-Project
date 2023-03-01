@@ -68,7 +68,20 @@ def process_data(window_size=1):
         ictal, interictal = split_eeg_into_classes(patient_files, patient)
         ictal_train, ictal_val = [], []
         interictal_train, interictal_val = [], []
-        for segment in ictal:
+
+        # need to create directory if it doesnt already exist
+        if not os.path.isdir(os.path.join('.', 'Processed_Data', patient_id)):
+            os.mkdir(os.path.join('.', 'Processed_Data', patient_id))
+
+        # after 1000 examples, we want to create a separate batched file
+        save_threshold = 1000
+
+        num_train_processed = 0
+        num_val_processed = 0
+        train_save_count = 0
+        val_save_count = 0
+        while len(ictal) > 0:
+            segment = ictal.pop()
             # we want to window this segment, run short fourier transform and send to train/val
             # the latter 25% are sent to validation
             windows = window_recordings(segment, window_size=window_size)
@@ -78,34 +91,50 @@ def process_data(window_size=1):
             # 75% sent to train, 25% sent to validation
             train, val = np.split(windows, [int(len(windows) * 0.75)])
             train, val = stft_recordings(train), stft_recordings(val)
+
             # adding to data pool
             ictal_train.append(train)
             ictal_val.append(val)
 
-        # need to create directory if it doesnt already exist
-        if not os.path.isdir(os.path.join('.', 'Processed_Data', patient_id)):
-            os.mkdir(os.path.join('.', 'Processed_Data', patient_id))
+            num_train_processed += train.shape[0]
+            num_val_processed += val.shape[0]
+
+            if num_train_processed > save_threshold or len(ictal) == 0:
+                # we should save this array
+                ictal_train = np.concatenate(ictal_train, axis=0, dtype=np.float32)
+                # 22 channels
+                assert ictal_train.shape[1] == 22
+                # 114 frequencies in frequency domain
+                assert ictal_train.shape[2] == 114
+                train_save_count += 1
+                np.savez_compressed(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-'+str(train_save_count)+'-ictal_train.npy'),
+                        ictal_train)
+                # resetting
+                ictal_train = []
+
+            if num_val_processed > save_threshold or len(ictal)==0:
+                # we should save this array
+                ictal_val = np.concatenate(ictal_val, axis=0, dtype=np.float32)
+                # 22 channels
+                assert ictal_val.shape[1] == 22
+                # 114 frequencies in frequency domain
+                assert ictal_val.shape[2] == 114
+                val_save_count += 1
+                np.savez_compressed(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-' + str(val_save_count) \
+                                     + '-ictal_val.npy'),
+                        ictal_val)
+                # resetting
+                ictal_val = []
 
         # most of our values have around 9 digits of precision and exponent around -05 to -08, so float32 is all we need
         # saving ictal data to disk (we are saving as float32, float64 is going to be worse in our case
 
-        ictal_train = np.concatenate(ictal_train, axis=0, dtype=np.float32)
-        # 22 channels
-        assert ictal_train.shape[1] == 22
-        # 114 frequencies in frequency domain
-        assert ictal_train.shape[2] == 114
-        np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-ictal_train.npy'), ictal_train)
-        del ictal_train
-
-        ictal_val = np.concatenate(ictal_val, axis=0, dtype=np.float32)
-        # 22 channels
-        assert ictal_val.shape[1] == 22
-        # 114 frequencies in frequency domain
-        assert ictal_val.shape[2] == 114
-        np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-ictal_val.npy'), ictal_val)
-        del ictal_val
-
-        for segment in interictal:
+        num_train_processed = 0
+        num_val_processed = 0
+        train_save_count = 0
+        val_save_count = 0
+        while len(interictal)>0:
+            segment = interictal.pop()
             # the latter 25% are sent to validation
             # we want to window this segment, run short fourier transform and send to train/val
             windows = window_recordings(segment, window_size=window_size)
@@ -115,28 +144,41 @@ def process_data(window_size=1):
             train, val = np.split(windows, [int(len(windows) * 0.75)])
 
             train, val = stft_recordings(train), stft_recordings(val)
+
             # adding to data pool
             interictal_train.append(train)
             interictal_val.append(val)
 
-        # saving interictal to disk (saving as float32 type)
-        interictal_train = np.concatenate(interictal_train, axis=0, dtype=np.float32)
-        # 22 channels
-        assert interictal_train.shape[1] == 22
-        # 114 frequencies in frequency domain
-        assert interictal_train.shape[2] == 114
-        np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-interictal_train.npy'),
-                interictal_train)
-        del interictal_train
+            num_train_processed += train.shape[0]
+            num_val_processed += val.shape[0]
 
-        interictal_val = np.concatenate(interictal_val, axis=0, dtype=np.float32)
-        # 22 channels
-        assert interictal_val.shape[1] == 22
-        # 114 frequencies in frequency domain
-        assert interictal_val.shape[2] == 114
-        np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-interictal_val.npy'),
-                interictal_val)
-        del interictal_val
+            if num_train_processed > save_threshold or len(interictal) == 0:
+                # we should save this array
+                interictal_train = np.concatenate(interictal_train, axis=0, dtype=np.float32)
+                # 22 channels
+                assert interictal_train.shape[1] == 22
+                # 114 frequencies in frequency domain
+                assert interictal_train.shape[2] == 114
+                train_save_count += 1
+                np.savez_compressed(os.path.join('.', 'Processed_Data', patient_id,
+                                     str(window_size) + '-' + str(train_save_count) + '-interictal_train.npy'),
+                        interictal_train)
+                # resetting
+                interictal_train = []
+
+            if num_val_processed > save_threshold or len(interictal) == 0:
+                # we should save this array
+                interictal_val = np.concatenate(interictal_val, axis=0, dtype=np.float32)
+                # 22 channels
+                assert interictal_val.shape[1] == 22
+                # 114 frequencies in frequency domain
+                assert interictal_val.shape[2] == 114
+                val_save_count += 1
+                np.savez_compressed(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-' + str(val_save_count) \
+                                     + '-interictal_val.npy'),
+                        interictal_val)
+                # resetting
+                interictal_val = []
 
 
 # function that retrieves all summary text files
@@ -376,7 +418,7 @@ def extract_section(file_path, start_end):
     # data is in shape (num_channels,samples)
     final_data = data[:, sampling_rate * start_end[0]:sampling_rate * start_end[1]]
     # channel check for invalid data
-    if final_data.shape[0] !=22:
+    if final_data.shape[0] != 22:
         return None
     return final_data
 
