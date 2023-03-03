@@ -66,6 +66,16 @@ def npy_to_tf(filename):
 
     return data,labels
 
+# applying stft to a tf tensor to convert to frequency domain
+def stft_samples(tf_tensor):
+    tensor_stft = tf.signal.stft(tf_tensor, frame_length=256, frame_step=128, fft_length=256, pad_end=False)
+    indices_wanted = [i for i in range(1, 57)] + [i for i in range(64, 117)] + [i for i in range(124,129)]
+    # filtering out bad frequencies
+    # removing DC component (0 Hz), the 57-63Hz and 117-123Hz bands (specific for chb-mit dataset)
+    tensor_stft = tf.gather(tensor_stft, axis=-1, indices=indices_wanted)
+    # obtaining magnitude, since stft returns complex numbers
+    tensor_stft = tf.abs(tensor_stft)
+    return tensor_stft
 
 ''' USE THIS FUNCTION TO GET A DATASET WE CAN LOAD INTO OUR KERAS MODEL'''
 # tensorflow data pipeline based on our metadata
@@ -95,6 +105,8 @@ def tf_dataset(split='train',window_size=1,leave_out='chb01'):
     dataset = dataset.map(lambda x: tf.py_function(npy_to_tf,inp=[x],Tout=[tf.float32,tf.float32]))
     # taking the batched data and batched labels and flattening them (preserves order)
     examples = dataset.flat_map(lambda example,label: tf.data.Dataset.from_tensor_slices(example))
+    # applying stft transform to our examples
+    examples = examples.map(stft_samples)
     labels = dataset.flat_map(lambda example,label: tf.data.Dataset.from_tensor_slices(label))
     # zipping together flattened examples to form final dataset
     dataset = tf.data.Dataset.zip((examples,labels))
@@ -117,3 +129,7 @@ print(get_class_counts(test))
 count = test.reduce(0, lambda x,_: x+1).numpy()
 print(count)
 '''
+
+
+test = tf_dataset(split='train',window_size=1)
+print(next(iter(test)))

@@ -111,7 +111,7 @@ def process_data(window_size=1,size_threshold=None):
                 continue
             # 75% sent to train, 25% sent to validation
             train, val = np.split(windows, [int(len(windows) * 0.75)])
-            train, val = stft_recordings(train), stft_recordings(val)
+            #train, val = stft_recordings(train), stft_recordings(val)
 
             # adding to data pool
             ictal_train.append(train)
@@ -124,9 +124,9 @@ def process_data(window_size=1,size_threshold=None):
                 # we should save this array
                 ictal_train = np.concatenate(ictal_train, axis=0, dtype=np.float32)
                 # 22 channels
-                assert ictal_train.shape[1] == 22
+                #assert ictal_train.shape[1] == 22
                 # 114 frequencies in frequency domain
-                assert ictal_train.shape[2] == 114
+                #assert ictal_train.shape[2] == 114
                 train_save_count += 1
                 np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-'+str(train_save_count)+'-ictal_train.npy'),
                         ictal_train)
@@ -141,9 +141,9 @@ def process_data(window_size=1,size_threshold=None):
                 # we should save this array
                 ictal_val = np.concatenate(ictal_val, axis=0, dtype=np.float32)
                 # 22 channels
-                assert ictal_val.shape[1] == 22
+                #assert ictal_val.shape[1] == 22
                 # 114 frequencies in frequency domain
-                assert ictal_val.shape[2] == 114
+                #assert ictal_val.shape[2] == 114
                 val_save_count += 1
                 np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-' + str(val_save_count) \
                                      + '-ictal_val.npy'),
@@ -172,7 +172,7 @@ def process_data(window_size=1,size_threshold=None):
                 continue
             train, val = np.split(windows, [int(len(windows) * 0.75)])
 
-            train, val = stft_recordings(train), stft_recordings(val)
+            #train, val = stft_recordings(train), stft_recordings(val)
 
             # adding to data pool
             interictal_train.append(train)
@@ -185,9 +185,9 @@ def process_data(window_size=1,size_threshold=None):
                 # we should save this array
                 interictal_train = np.concatenate(interictal_train, axis=0, dtype=np.float32)
                 # 22 channels
-                assert interictal_train.shape[1] == 22
+                #assert interictal_train.shape[1] == 22
                 # 114 frequencies in frequency domain
-                assert interictal_train.shape[2] == 114
+                #assert interictal_train.shape[2] == 114
                 train_save_count += 1
                 np.save(os.path.join('.', 'Processed_Data', patient_id,
                                      str(window_size) + '-' + str(train_save_count) + '-interictal_train.npy'),
@@ -203,9 +203,9 @@ def process_data(window_size=1,size_threshold=None):
                 # we should save this array
                 interictal_val = np.concatenate(interictal_val, axis=0, dtype=np.float32)
                 # 22 channels
-                assert interictal_val.shape[1] == 22
+                #assert interictal_val.shape[1] == 22
                 # 114 frequencies in frequency domain
-                assert interictal_val.shape[2] == 114
+                #assert interictal_val.shape[2] == 114
                 val_save_count += 1
                 np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-' + str(val_save_count) \
                                      + '-interictal_val.npy'),
@@ -484,6 +484,10 @@ def window_recordings(eeg_raw_data, sampling_frequency=256, window_size=12):
 # function that takes an eeg window, and applies the short term fourier transform with window and overlap parameters
 # we filter out noise frequency and DC frequency specific to the CHB-MIT scalp EEG dataset
 # this function can take a batch of eeg windows as long as the batch is the first dimension
+'''
+    DO NOT USE THIS FUNCTION! INSTEAD WE SAVE THE RAW WINDOWED SAMPLES TO DISK
+    THEN, WHEN LOADING THE SAMPLES INTO TENSORFLOW, WE USE TF.STFT (much more efficient in our testing)
+'''
 def stft_recordings(eeg_window, sampling_frequency=256, window=256, overlap=None):
     # applying stft to data
     _, _, frequencies = signal.stft(eeg_window, fs=sampling_frequency, nperseg=window, noverlap=overlap)
@@ -558,4 +562,4 @@ def grab_missing_records(record_list):
     Below is some basic logic I wrote while testing stuff
 '''
 
-process_data(window_size=12,size_threshold=3221225472)
+process_data(window_size=1,size_threshold=None)
