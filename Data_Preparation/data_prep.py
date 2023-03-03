@@ -95,7 +95,10 @@ def process_data(window_size=1,size_threshold=None):
             os.mkdir(os.path.join('.', 'Processed_Data', patient_id))
 
         # after 1000 examples, we want to create a separate batched file
-        save_threshold = 1000
+        if window_size==1:
+            save_threshold = 12000
+        else:
+            save_threshold = 1000
 
         num_train_processed = 0
         num_val_processed = 0
