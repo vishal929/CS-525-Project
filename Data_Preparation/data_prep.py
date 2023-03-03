@@ -51,9 +51,30 @@ def preprocess_metadata():
 
     return final_mapping
 
+# function that returns true if a directory is over the given size threshold
+# this will help in pruning our huge data with 12s windows
+# if threshold is none, then we do no pruning
+def dir_over_limit(folder_path,threshold=None,window_size=12):
+    if threshold is None:
+        return False
+    else:
+        tot_size = 0
+        for entry in os.scandir(folder_path):
+            # checking if this file corresponds to our window size (if not, then we dont count it in the threshold)
+            if entry.name[0:2] == str(window_size):
+                tot_size += os.path.getsize(entry)
+        if tot_size > threshold:
+            return True
+        else:
+            return False
+
+
 
 # function that processes,tags, and splits data eeg data for seizure classification based on processed metadata
-def process_data(window_size=1):
+# window size is the window to generate sequences from ictal and interictal segments
+# threshold is the max size of data we want for each patient (we set this so that we do not get huge data for compute)
+# if threshold is set to None, there is no threshold (no limit)
+def process_data(window_size=1,size_threshold=None):
     metadata = preprocess_metadata()
     for patient in metadata:
         # patient 12 and 24 should be omitted due to no valid interictal data
@@ -109,6 +130,9 @@ def process_data(window_size=1):
                 train_save_count += 1
                 np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-'+str(train_save_count)+'-ictal_train.npy'),
                         ictal_train)
+                # checking if we are over the limit
+                if dir_over_limit(os.path.join('.', 'Processed_Data', patient_id),threshold=size_threshold,window_size=window_size):
+                    break
                 # resetting
                 ictal_train = []
                 num_train_processed=0
@@ -124,6 +148,9 @@ def process_data(window_size=1):
                 np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-' + str(val_save_count) \
                                      + '-ictal_val.npy'),
                         ictal_val)
+                # checking if we are over the limit
+                if dir_over_limit(os.path.join('.', 'Processed_Data', patient_id), threshold=size_threshold,window_size=window_size):
+                    break
                 # resetting
                 ictal_val = []
                 num_val_processed=0
@@ -165,6 +192,9 @@ def process_data(window_size=1):
                 np.save(os.path.join('.', 'Processed_Data', patient_id,
                                      str(window_size) + '-' + str(train_save_count) + '-interictal_train.npy'),
                         interictal_train)
+                # checking if we are over the limit
+                if dir_over_limit(os.path.join('.', 'Processed_Data', patient_id), threshold=size_threshold,window_size=window_size):
+                    break
                 # resetting
                 interictal_train = []
                 num_train_processed=0
@@ -180,6 +210,9 @@ def process_data(window_size=1):
                 np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-' + str(val_save_count) \
                                      + '-interictal_val.npy'),
                         interictal_val)
+                # checking if we are over the limit
+                if dir_over_limit(os.path.join('.', 'Processed_Data', patient_id), threshold=size_threshold,window_size=window_size):
+                    break
                 # resetting
                 interictal_val = []
                 num_val_processed=0
@@ -525,4 +558,4 @@ def grab_missing_records(record_list):
     Below is some basic logic I wrote while testing stuff
 '''
 
-process_data(window_size=12)
+process_data(window_size=12,size_threshold=3221225472)
