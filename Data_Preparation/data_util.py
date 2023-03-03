@@ -105,14 +105,14 @@ def tf_dataset(split='train',window_size=1,leave_out='chb01'):
 # labels are 0 or 1
 # we return the count of zeros first, then the count of ones
 def get_class_counts(tf_dataset):
-    ones = tf_dataset.filter(lambda example,label: label == 0).reduce(0,lambda zero,_:zero+1).numpy()
-    zeros = tf_dataset.filter(lambda example,label: label == 1).reduce(0,lambda one,_:one+1).numpy()
+    zeros = tf_dataset.filter(lambda example,label: label == 0).reduce(0,lambda zero,_:zero+1).numpy()
+    ones = tf_dataset.filter(lambda example,label: label == 1).reduce(0,lambda one,_:one+1).numpy()
     return zeros,ones
 
 
 ''' EXAMPLE OF HOW TO COUNT IN THE DATASET (we need eager execution due to transformations)'''
 '''
-test = tf_dataset(split='val')
+test = tf_dataset(split='train')
 print(get_class_counts(test))
 count = test.reduce(0, lambda x,_: x+1).numpy()
 print(count)
