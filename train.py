@@ -2,6 +2,10 @@
 from Models import model
 from Data_Preparation import data_util
 
+'''
+Not sure if it would be better to write train and test functions from scratch, 
+but Keras has built-in methods for this
+'''
 def train(model, tf_dataset, val_set):
     # train_batch_size = ?, steps_per_epoch should be num_samples // train_batch_size
     # val_batch_size = ?, validation_steps should be num_val_samples // val_batch_size
@@ -19,4 +23,4 @@ tf_dataset = data_util.tf_dataset('train')
 val_set = data_util.tf_dataset('val')
 model = model.buildModel()
 
-train(model,tf_dataset, val_set)
+trained_model = train(model,tf_dataset, val_set)
