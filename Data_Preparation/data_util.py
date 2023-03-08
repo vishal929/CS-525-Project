@@ -139,10 +139,12 @@ def get_class_counts(tf_dataset):
 
 
 ''' EXAMPLE OF HOW TO COUNT IN THE DATASET (we need eager execution due to transformations)'''
+'''
 test = tf_dataset(split='val')
 print(get_class_counts(test))
 count = test.reduce(0, lambda x,_: x+1).numpy()
 print(count)
+'''
 
 
 #test = tf_dataset(split='train',window_size=1)
