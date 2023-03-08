@@ -1,6 +1,5 @@
 #!/bin/bash -l
 #SBATCH --output=train_run.txt
-#SBATCH --workdir= /freespace/local/NET_ID_HERE/CS-525
 
 nvidia-smi
 source activate python38
