@@ -107,7 +107,14 @@ def tf_dataset(split='train',window_size=1,leave_out='chb01'):
     examples = dataset.flat_map(lambda example,label: tf.data.Dataset.from_tensor_slices(example))
     # applying stft transform to our examples
     examples = examples.map(stft_samples)
+    # need to squeeze the extra dimension if needed
+    examples = examples.map(tf.squeeze)
+    # if our window size is 1, we need to explicitly set a channel to process like an image
+    if window_size == 1:
+        examples= examples.map(lambda example: tf.expand_dims(example,axis=0))
     labels = dataset.flat_map(lambda example,label: tf.data.Dataset.from_tensor_slices(label))
+    # need to provide labels as a one-hot-encoding in keras api
+    labels = labels.map(lambda label: tf.one_hot(label,depth=2))
     # zipping together flattened examples to form final dataset
     dataset = tf.data.Dataset.zip((examples,labels))
     return dataset
