@@ -1,0 +1,5 @@
+#!/bin/bash -l
+
+nvidia-smi
+cd /filer/tmp1/NET_ID_HERE/CS-525-Project
+python train.py

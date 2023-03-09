@@ -1,6 +1,9 @@
+import os
+
 import tensorflow as tf
 from pathlib import Path
 import numpy as np
+from constants import ROOT_DIR
 
 # this file houses logic associated with data preparation for deep learning
 # i.e loading the dataset, and computing class weights
@@ -55,10 +58,10 @@ def npy_to_tf(filename):
     data = np.load(filename_str)
     if tf.strings.regex_full_match(filename,'.*interictal.*'):
         #labels = np.zeros(shape = (data.shape[0]))
-        labels = tf.zeros(shape = (data.shape[0]),dtype=tf.float32)
+        labels = tf.zeros(shape = (data.shape[0]),dtype=tf.uint8)
     else:
         #labels = np.ones(shape = (data.shape[0]),dtype = np.int8)
-        labels = tf.ones(shape=(data.shape[0]), dtype=tf.float32)
+        labels = tf.ones(shape=(data.shape[0]), dtype=tf.uint8)
 
     #print(data[0].shape)
     #print(data)
@@ -89,7 +92,10 @@ def tf_dataset(split='train',window_size=1,leave_out='chb01'):
         raise Exception('split provided is not one of train,test, or val')
     if split != 'test':
         # need to grab data and filter out any data relating to the leave out patient
-        dataset = tf.data.Dataset.list_files('./Processed_Data/*/'+str(window_size)+'-'+'*'+split+'.npy')
+        dataset_glob_path = os.path.join(ROOT_DIR,'Data_Preparation','Processed_Data','*'
+                                         ,str(window_size)+'-'+'*'+split+'.npy')
+        dataset = tf.data.Dataset.list_files(dataset_glob_path)
+        #dataset = tf.data.Dataset.list_files(ROOT_DIR'./Processed_Data/*/'+str(window_size)+'-'+'*'+split+'.npy')
         dataset_list = list(dataset)
         filtered_list = []
         for data in dataset_list:
@@ -100,16 +106,38 @@ def tf_dataset(split='train',window_size=1,leave_out='chb01'):
         dataset = tf.data.Dataset.from_tensor_slices(filtered_list)
     else:
         # we want the entire data for patient chb01 in this case for testing
-        dataset = tf.data.Dataset.list_files('./Processed_Data/'+leave_out+'/'+str(window_size)+'*.npy')
+        dataset_glob_path = os.path.join(ROOT_DIR, 'Data_Preparation', 'Processed_Data', leave_out
+                                         , str(window_size) + '-*.npy')
+        dataset = tf.data.Dataset.list_files(dataset_glob_path)
+        #dataset = tf.data.Dataset.list_files('./Processed_Data/'+leave_out+'/'+str(window_size)+'*.npy')
     # converting filename to batched numpy array and batched label tensors
-    dataset = dataset.map(lambda x: tf.py_function(npy_to_tf,inp=[x],Tout=[tf.float32,tf.float32]))
+    dataset = dataset.map(lambda x: tf.py_function(npy_to_tf,inp=[x],Tout=[tf.float32,tf.uint8]),
+                          num_parallel_calls=tf.data.AUTOTUNE)
     # taking the batched data and batched labels and flattening them (preserves order)
     examples = dataset.flat_map(lambda example,label: tf.data.Dataset.from_tensor_slices(example))
     # applying stft transform to our examples
-    examples = examples.map(stft_samples)
+    examples = examples.map(stft_samples,num_parallel_calls=tf.data.AUTOTUNE)
+    # need to squeeze the extra dimension if needed
+    examples = examples.map(tf.squeeze,num_parallel_calls=tf.data.AUTOTUNE)
+    # if our window size is 1, we need to explicitly set a channel to process like an image
+    if window_size == 1:
+        examples= examples.map(lambda example: tf.expand_dims(example,axis=0),num_parallel_calls=tf.data.AUTOTUNE)
     labels = dataset.flat_map(lambda example,label: tf.data.Dataset.from_tensor_slices(label))
+    # need to provide labels as a one-hot-encoding in keras api
+    #labels = labels.map(lambda label: tf.one_hot(label,depth=2),num_parallel_calls=tf.data.AUTOTUNE)
     # zipping together flattened examples to form final dataset
     dataset = tf.data.Dataset.zip((examples,labels))
+    # adding sample weighting for imbalances only for the training set
+    if split=='train':
+        # getting imbalance count
+        num_interictal, num_ictal = get_class_counts(dataset)
+        imbalance = -(num_interictal//-num_ictal)
+        ictals = dataset.filter(lambda example,label: label==0)
+        ictals = ictals.map(lambda example,label: (example,label,imbalance))
+        interictals = dataset.filter(lambda example,label: label==1)
+        interictals=interictals.map(lambda example,label: (example,label,1))
+        dataset = ictals.concatenate(interictals)
+        #dataset = dataset.map(lambda example,label: add_sample_weighting(example,imbalance))
     return dataset
 
 # function that gives class counts for a binary classification task
@@ -117,19 +145,19 @@ def tf_dataset(split='train',window_size=1,leave_out='chb01'):
 # labels are 0 or 1
 # we return the count of zeros first, then the count of ones
 def get_class_counts(tf_dataset):
-    zeros = tf_dataset.filter(lambda example,label: label == 0).reduce(0,lambda zero,_:zero+1).numpy()
-    ones = tf_dataset.filter(lambda example,label: label == 1).reduce(0,lambda one,_:one+1).numpy()
+    total = tf_dataset.reduce(0,lambda y,_: y+1)
+    ones = tf_dataset.filter(lambda example,label: label==1).reduce(0,lambda y,_:y+1)
+    zeros = total-ones
     return zeros,ones
-
 
 ''' EXAMPLE OF HOW TO COUNT IN THE DATASET (we need eager execution due to transformations)'''
 '''
-test = tf_dataset(split='train')
+test = tf_dataset(split='val')
 print(get_class_counts(test))
 count = test.reduce(0, lambda x,_: x+1).numpy()
 print(count)
 '''
 
 
-test = tf_dataset(split='train',window_size=1)
-print(next(iter(test)))
+#test = tf_dataset(split='val',window_size=1)
+#print(next(iter(test)))
