@@ -124,7 +124,7 @@ def tf_dataset(split='train',window_size=1,leave_out='chb01'):
         examples= examples.map(lambda example: tf.expand_dims(example,axis=0),num_parallel_calls=tf.data.AUTOTUNE)
     labels = dataset.flat_map(lambda example,label: tf.data.Dataset.from_tensor_slices(label))
     # need to provide labels as a one-hot-encoding in keras api
-    labels = labels.map(lambda label: tf.one_hot(label,depth=2),num_parallel_calls=tf.data.AUTOTUNE)
+    #labels = labels.map(lambda label: tf.one_hot(label,depth=2),num_parallel_calls=tf.data.AUTOTUNE)
     # zipping together flattened examples to form final dataset
     dataset = tf.data.Dataset.zip((examples,labels))
     # adding sample weighting for imbalances only for the training set
