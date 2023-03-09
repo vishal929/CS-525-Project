@@ -17,7 +17,7 @@ def train(model, tf_dataset, val_set, batch_size=32):
     val_set = val_set.batch(batch_size,num_parallel_calls=tf.data.AUTOTUNE)
     # train_batch_size = ?, steps_per_epoch should be num_samples // train_batch_size
     # val_batch_size = ?, validation_steps should be num_val_samples // val_batch_size
-    trained_model = model.fit(tf_dataset, epochs=6, verbose=2, validation_data=val_set,callbacks=[early_stop])
+    trained_model = model.fit(tf_dataset, epochs=30, verbose=2, validation_data=val_set,callbacks=[early_stop])
     return trained_model
 
 # print gpu availability
