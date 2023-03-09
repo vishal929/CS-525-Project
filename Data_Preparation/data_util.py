@@ -132,9 +132,9 @@ def tf_dataset(split='train',window_size=1,leave_out='chb01'):
         # getting imbalance count
         num_interictal, num_ictal = get_class_counts(dataset)
         imbalance = -(num_interictal//-num_ictal)
-        ictals = dataset.filter(lambda example,label: label[0]==0)
+        ictals = dataset.filter(lambda example,label: label==0)
         ictals = ictals.map(lambda example,label: (example,label,imbalance))
-        interictals = dataset.filter(lambda example,label: label[0]==1)
+        interictals = dataset.filter(lambda example,label: label==1)
         interictals=interictals.map(lambda example,label: (example,label,1))
         dataset = ictals.concatenate(interictals)
         #dataset = dataset.map(lambda example,label: add_sample_weighting(example,imbalance))
@@ -146,7 +146,7 @@ def tf_dataset(split='train',window_size=1,leave_out='chb01'):
 # we return the count of zeros first, then the count of ones
 def get_class_counts(tf_dataset):
     total = tf_dataset.reduce(0,lambda y,_: y+1)
-    ones = tf_dataset.filter(lambda example,label: label[1]==1).reduce(0,lambda y,_:y+1)
+    ones = tf_dataset.filter(lambda example,label: label==1).reduce(0,lambda y,_:y+1)
     zeros = total-ones
     return zeros,ones
 
