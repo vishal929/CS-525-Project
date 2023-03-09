@@ -2,6 +2,4 @@
 
 nvidia-smi
 cd /filer/tmp1/NET_ID_HERE/CS-525-Project
-source activate python38
-conda activate cs525
 python train.py
