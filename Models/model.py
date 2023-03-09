@@ -43,14 +43,15 @@ def buildModel():
     model = keras.Model(input, output)
     # Finally, we compute the cross-entropy loss between true labels and predicted labels to account for
     # the class imbalance between seizure and non-seizure depicting data
-    loss_func = keras.losses.binary_crossentropy
+    loss_func = keras.losses.categorical_crossentropy
+    #loss_func = keras.losses.binary_crossentropy
     optim = keras.optimizers.RMSprop(learning_rate=0.0001)
     metrics = [
         keras.metrics.TruePositives(name='tp'),
         keras.metrics.FalsePositives(name='fp'),
         keras.metrics.TrueNegatives(name='tn'),
         keras.metrics.FalseNegatives(name='fn'),
-        keras.metrics.BinaryAccuracy(name='accuracy'),
+        keras.metrics.CategoricalAccuracy(name='accuracy'),
         keras.metrics.Precision(name='precision'),
         keras.metrics.Recall(name='recall'),
         keras.metrics.AUC(name='auc'),
