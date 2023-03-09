@@ -25,7 +25,7 @@ print(tf.config.get_visible_devices())
 
 # printing task before training
 window_size = 1
-batch_size=128
+batch_size=32768
 leave_out = 'chb01'
 print('training, batch_size = ' + str(batch_size) + ', leave_out=' + str(leave_out))
 
