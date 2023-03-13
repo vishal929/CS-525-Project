@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow import keras
 
-
+# around 92k params
 # Building the convolutional neural network:
 def buildModel():
     input = keras.Input(shape=(1, 22, 114))  # consists of 22 EEG channels
