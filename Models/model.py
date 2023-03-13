@@ -60,3 +60,11 @@ def buildModel():
     model.compile(loss=loss_func, optimizer=optim, metrics=metrics, )
     print('CNN model successfully built')
     return model
+
+# loading a model from a saved checkpoint
+# model path should be something like '...../Trained Models/chb01-1.ckpt'
+# chb01 is the leave-out and 1 is the window_size
+def load_model(model_path):
+    model = buildModel()
+    model.load_weights(model_path)
+
