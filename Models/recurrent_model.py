@@ -1,8 +1,8 @@
 # this model is a recurrent model based on LMUs for processing 12s window segments for binary classification
 # since we do not require intermediate outputs, we can parallelize the lmu!
 
-import nengo
-import nengo_dl
+#import nengo
+#import nengo_dl
 #from nengo.utils.filter_design import cont2discrete
 from scipy.signal import cont2discrete
 import numpy as np
@@ -16,62 +16,7 @@ tf.compat.v1.enable_eager_execution(
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
-class LMUCell(nengo.Network):
-    def __init__(self, units, order, theta, input_d, **kwargs):
-        super().__init__(**kwargs)
 
-        # compute the A and B matrices according to the LMU's mathematical derivation
-        # (see the paper for details)
-        Q = np.arange(order, dtype=np.float64)
-        R = (2 * Q + 1)[:, None] / theta
-        j, i = np.meshgrid(Q, Q)
-
-        A = np.where(i < j, -1, (-1.0) ** (i - j + 1)) * R
-        B = (-1.0) ** Q[:, None] * R
-        C = np.ones((1, order))
-        D = np.zeros((1,))
-
-        A, B, _, _, _ = cont2discrete((A, B, C, D), dt=1.0, method="zoh")
-
-        with self:
-            nengo_dl.configure_settings(trainable=None)
-
-            # create objects corresponding to the x/u/m/h variables in the above diagram
-            self.x = nengo.Node(size_in=input_d)
-            self.u = nengo.Node(size_in=1)
-            self.m = nengo.Node(size_in=order)
-            self.h = nengo_dl.TensorNode(tf.nn.tanh, shape_in=(units,), pass_time=False)
-
-            # compute u_t from the above diagram. we have removed e_h and e_m as they
-            # are not needed in this task.
-            nengo.Connection(
-                self.x, self.u, transform=np.ones((1, input_d)), synapse=None
-            )
-
-            # compute m_t
-            # in this implementation we'll make A and B non-trainable, but they
-            # could also be optimized in the same way as the other parameters.
-            # note that setting synapse=0 (versus synapse=None) adds a one-timestep
-            # delay, so we can think of any connections with synapse=0 as representing
-            # value_{t-1}.
-            conn_A = nengo.Connection(self.m, self.m, transform=A, synapse=0)
-            self.config[conn_A].trainable = False
-            conn_B = nengo.Connection(self.u, self.m, transform=B, synapse=None)
-            self.config[conn_B].trainable = False
-
-            # compute h_t
-            nengo.Connection(
-                self.x, self.h, transform=nengo_dl.dists.Glorot(), synapse=None
-            )
-            nengo.Connection(
-                self.h, self.h, transform=nengo_dl.dists.Glorot(), synapse=0
-            )
-            nengo.Connection(
-                self.m,
-                self.h,
-                transform=nengo_dl.dists.Glorot(),
-                synapse=None,
-            )
 
 # LMU module definition in the Keras API
 class KerasLMU(tf.keras.layers.Layer):
@@ -287,7 +232,8 @@ def build_parallel_lmu(order,theta,hidden_dim,num_lmus=1):
     print('Parallel LMU model successfully built')
     return model
 
-model = build_lmu(40,50,128,num_lmus=3)
+'''
+model = build_lmu(256,784,256,num_lmus=2)
 print(model.predict_on_batch(tf.random.normal(shape=(2,23,2508),dtype=tf.float32)))
 
 
@@ -302,3 +248,4 @@ print('Non-trainable params: {:,}'.format(non_trainable_count))
 
 
 #converted = nengo_dl.Converter(model)
+'''

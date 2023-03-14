@@ -1,5 +1,5 @@
 # file for training our model
-from Models import model
+from Models import model,recurrent_model
 from Data_Preparation import data_util
 import tensorflow as tf
 import os
@@ -39,14 +39,14 @@ def train(model, tf_dataset, val_set, model_save_name, batch_size=32):
 print(tf.config.get_visible_devices())
 
 # printing task before training
-window_size = 1
-batch_size = 32768
+window_size = 12
+batch_size = 256
 leave_out = 'chb01'
 print('training, batch_size = ' + str(batch_size) + ', leave_out=' + str(leave_out) + ', win_size: ' + str(window_size))
 model_saved_name = str(leave_out) + '----' + str(window_size)
 
 tf_dataset = data_util.tf_dataset('train', window_size=window_size, leave_out=leave_out)
 val_set = data_util.tf_dataset('val')
-model = model.buildModel()
+model = recurrent_model.build_lmu(256,784,256,num_lmus=2)
 
 trained_model = train(model, tf_dataset, val_set, model_saved_name, batch_size=batch_size)
