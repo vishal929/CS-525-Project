@@ -1,5 +1,10 @@
 import tensorflow as tf
 from tensorflow import keras
+import nengo_dl
+
+# TEMP FIX FOR SOME RUNTIME ISSUES
+import os
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 # around 92k params
 # Building the convolutional neural network:
@@ -12,7 +17,7 @@ def buildModel():
     x = keras.layers.Conv2D(16, (22, 5), strides=(1, 2), padding='valid', data_format="channels_first",
                             activation=tf.nn.relu)(input)
     # For each channel, MaxPool2D() takes the max value within a designated window of the input of size (1, 2)
-    x = keras.layers.MaxPool2D(pool_size=(1, 2), data_format="channels_first", padding='same')(x)
+    x = keras.layers.MaxPool2D(pool_size=(1, 2), data_format="channels_first", padding='valid')(x)
     # Then, we normalize the max value just collected
     x = keras.layers.BatchNormalization()(x)
 
@@ -68,3 +73,16 @@ def load_model(model_path):
     model = buildModel()
     model.load_weights(model_path)
 
+# function that converts this keras model into an snn via nengo_converter
+def convert_snn():
+    model = buildModel()
+    # need to remove dropout layers because they are not supported in nengo
+    #print(model.summary())
+    converted = nengo_dl.Converter(model,max_to_avg_pool=True,inference_only=True)
+    print(converted.verify())
+    return converted
+
+converted = convert_snn()
+
+#with nengo_dl.Simulator(converted.net) as sim:
+#    sim.run(3)

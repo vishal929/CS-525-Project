@@ -9,10 +9,151 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.keras import backend as K
 
-
+tf.compat.v1.enable_eager_execution(
+    config=None, device_policy=None, execution_mode=None
+)
 # TEMP FIX FOR SOME RUNTIME ISSUES
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
+
+class LMUCell(nengo.Network):
+    def __init__(self, units, order, theta, input_d, **kwargs):
+        super().__init__(**kwargs)
+
+        # compute the A and B matrices according to the LMU's mathematical derivation
+        # (see the paper for details)
+        Q = np.arange(order, dtype=np.float64)
+        R = (2 * Q + 1)[:, None] / theta
+        j, i = np.meshgrid(Q, Q)
+
+        A = np.where(i < j, -1, (-1.0) ** (i - j + 1)) * R
+        B = (-1.0) ** Q[:, None] * R
+        C = np.ones((1, order))
+        D = np.zeros((1,))
+
+        A, B, _, _, _ = cont2discrete((A, B, C, D), dt=1.0, method="zoh")
+
+        with self:
+            nengo_dl.configure_settings(trainable=None)
+
+            # create objects corresponding to the x/u/m/h variables in the above diagram
+            self.x = nengo.Node(size_in=input_d)
+            self.u = nengo.Node(size_in=1)
+            self.m = nengo.Node(size_in=order)
+            self.h = nengo_dl.TensorNode(tf.nn.tanh, shape_in=(units,), pass_time=False)
+
+            # compute u_t from the above diagram. we have removed e_h and e_m as they
+            # are not needed in this task.
+            nengo.Connection(
+                self.x, self.u, transform=np.ones((1, input_d)), synapse=None
+            )
+
+            # compute m_t
+            # in this implementation we'll make A and B non-trainable, but they
+            # could also be optimized in the same way as the other parameters.
+            # note that setting synapse=0 (versus synapse=None) adds a one-timestep
+            # delay, so we can think of any connections with synapse=0 as representing
+            # value_{t-1}.
+            conn_A = nengo.Connection(self.m, self.m, transform=A, synapse=0)
+            self.config[conn_A].trainable = False
+            conn_B = nengo.Connection(self.u, self.m, transform=B, synapse=None)
+            self.config[conn_B].trainable = False
+
+            # compute h_t
+            nengo.Connection(
+                self.x, self.h, transform=nengo_dl.dists.Glorot(), synapse=None
+            )
+            nengo.Connection(
+                self.h, self.h, transform=nengo_dl.dists.Glorot(), synapse=0
+            )
+            nengo.Connection(
+                self.m,
+                self.h,
+                transform=nengo_dl.dists.Glorot(),
+                synapse=None,
+            )
+
+# LMU module definition in the Keras API
+class KerasLMU(tf.keras.layers.Layer):
+    def __init__(self,order,theta,hidden_dim,trainable_A=False,trainable_B=False,use_em=False,use_eh=False):
+        super().__init__()
+        self.order = order
+        self.theta =theta
+        self.hidden_dim = hidden_dim
+        self.trainable_A = trainable_A
+        self.trainable_B = trainable_B
+        # LMU's have a state (using previous memory and hidden state)
+        #self.memory = tf.Variable(initial_value=tf.zeros((order,1)))
+        #self.hidden_state = tf.Variable(initial_value=tf.zeros((hidden_dim,1)))
+        # creating A and B matrices
+        A,B = get_state_space_matrices(order,theta)
+        A = tf.convert_to_tensor(A,dtype=tf.float32)
+        B = tf.convert_to_tensor(B,dtype=tf.float32)
+        self.A = tf.Variable(initial_value=A,trainable=trainable_A)
+        self.B = tf.Variable(initial_value=B,trainable=trainable_B)
+        self.use_em=use_em
+        self.use_eh = use_eh
+        # weights for computing input state (e_x will be built at build time when we know input dim)
+        if self.use_em:
+            # weight for squashing prior memory
+            self.e_m = self.add_weight(shape=(order,1),initializer='glorot_uniform',trainable=True)
+        if self.use_eh:
+            # weight for squashing prior hidden state
+            self.e_h =self.add_weight(shape=(hidden_dim,1),initializer='glorot_uniform',trainable=True)
+        # weight for computing portions of hidden states
+        # W_h, W_m (W_x will be built at build time, when we know the input dim)
+        self.W_h = self.add_weight(shape=(hidden_dim,hidden_dim),initializer='glorot_uniform',trainable=True)
+        self.W_m = self.add_weight(shape=(hidden_dim,order),initializer='glorot_uniform',trainable=True)
+
+    def build(self, input_shape):
+        # need to create W_x and e_x here
+        self.W_x = self.add_weight(shape=(input_shape[-1],self.hidden_dim),initializer='glorot_uniform',trainable=True)
+        self.e_x = self.add_weight(shape=(input_shape[-1],1),initializer='glorot_uniform',trainable=True)
+
+    def call(self,inputs):
+        # need to compute memories for each timestep
+        shape = tf.shape(inputs)
+        batch = shape[0]
+        timestep = shape[1]
+        memory = tf.zeros((batch,self.order,1),dtype=tf.float32)
+        # writing dummy timestep for t=-1
+        hiddens =tf.TensorArray(dtype=tf.float32,size=0,dynamic_size=True,clear_after_read=False)
+        hiddens = hiddens.write(0,tf.zeros((1,batch,self.hidden_dim),dtype=tf.float32))
+        # iterating over the time dimension
+        for i in range(1,timestep):
+            # transpose to get (batch,hidden_dim,1)
+            last_hidden = tf.transpose(hiddens.read(i-1),perm=[1,2,0])
+            feature = inputs[:,i,:]
+            # computing u
+            u = tf.matmul(feature,self.e_x)
+            if self.use_eh:
+                u = tf.add(u,tf.matmul(last_hidden,self.e_h))
+            if self.use_em:
+                u = tf.add(u,tf.matmul(memory,self.e_m))
+            # computing the new memory (m_t)
+            # need to expand B along the batch axis for scalar multiplication
+            # need to match u to B for scalar batch element wise multiplication
+            # U is of shape (batch,1) so we need to reshape it to (batch,order,1)
+            u = tf.expand_dims(u,axis=1)
+            u = tf.repeat(u,self.order,axis=1)
+            expanded_B = tf.repeat(tf.expand_dims(self.B,axis=0),batch,axis=0)
+            memory = tf.add(tf.matmul(self.A,memory),tf.multiply(expanded_B,u))
+            # computing the new hidden state (h_t)
+            in_act = tf.matmul(feature,self.W_x)
+            in_act = tf.expand_dims(in_act,axis=2)
+            hidden_act = tf.matmul(self.W_h,last_hidden)
+            memory_act = tf.matmul(self.W_m,memory)
+            # update hidden state for this timestep
+            hidden = tf.nn.relu(tf.add(in_act,tf.add(hidden_act,memory_act))) #batch,hidden_dim,1
+            # transpose to get (batch,1,hidden_dim)
+            hiddens = hiddens.write(i,tf.transpose(hidden,perm=[2,0,1]))
+        # concatenating along time dimension to get (time,batch,hidden_dim)
+        hiddens = hiddens.concat()
+        # tranpose to get (batch,time,hidden_dim)
+        hiddens = tf.transpose(hiddens,perm=[1,0,2])
+        return hiddens
+
+
 
 def get_state_space_matrices(order,theta):
     Q = np.arange(order, dtype=np.float64)
@@ -32,7 +173,7 @@ def build_H_parallel(A,B,sequence_length):
     print('B shape: '+ str(B.shape))
     # H is the matrix [A^0B, A^1B, ... , A^nB]
     H = []
-    mult = tf.identity(A)
+    mult = tf.eye(A.shape[0])
     for i in range(sequence_length):
         to_add = tf.matmul(mult,B)
         mult = tf.matmul(mult,A)
@@ -50,7 +191,8 @@ def build_H_parallel(A,B,sequence_length):
 
 def add_lmu(input,fft_H,hidden_dim):
     x = tf.keras.layers.Dense(1, activation='relu')(input)
-    x = tf.keras.layers.Reshape(target_shape=(1,23))(x)
+    #print(x.shape)
+    x = tf.keras.layers.Permute((2,1),input_shape=(23,1))(x)
     # fft on the input embedding
     x = tf.keras.layers.Lambda(lambda p: tf.signal.rfft(p, fft_length=tf.convert_to_tensor([2*23],dtype=tf.int32)))(x)
     # remove the pad element
@@ -69,6 +211,38 @@ def add_lmu(input,fft_H,hidden_dim):
     return x
 
 # this LMU consists of 3 lmu units of hidden_dim followed by a dense output layer with sigmoid binary output
+def build_lmu(order,theta,hidden_dim,num_lmus=1):
+    x=input = tf.keras.Input(shape=(23,2508))
+    # reshaping input to flatten HxW dimensions
+    #x = tf.keras.layers.Reshape(target_shape=(23, 2508))(input)
+    for i in range(num_lmus):
+       x = KerasLMU(order,theta,hidden_dim)(x)
+
+    # obtaining only the last hidden layer output
+    x = tf.keras.layers.Lambda(lambda x: x[:,-1])(x)
+    output = tf.keras.layers.Dense(1,activation='sigmoid')(x)
+
+    model = tf.keras.Model(input, output)
+    # Finally, we compute the cross-entropy loss between true labels and predicted labels to account for
+    # the class imbalance between seizure and non-seizure depicting data
+    # loss_func = keras.losses.categorical_crossentropy
+    loss_func = tf.keras.losses.binary_crossentropy
+    optim = tf.keras.optimizers.RMSprop(learning_rate=0.0001)
+    metrics = [
+        tf.keras.metrics.TruePositives(name='tp'),
+        tf.keras.metrics.FalsePositives(name='fp'),
+        tf.keras.metrics.TrueNegatives(name='tn'),
+        tf.keras.metrics.FalseNegatives(name='fn'),
+        tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+        tf.keras.metrics.Precision(name='precision'),
+        tf.keras.metrics.Recall(name='recall'),
+        tf.keras.metrics.AUC(name='auc'),
+    ]
+    model.compile(loss=loss_func, optimizer=optim, metrics=metrics,run_eagerly=True)
+    print('LMU model successfully built')
+    return model
+
+# this LMU consists of 3 lmu units of hidden_dim followed by a dense output layer with sigmoid binary output
 def build_parallel_lmu(order,theta,hidden_dim,num_lmus=1):
     # building A and B matrices based on ODE  (this part is based on LMU example code from nengo)
     A,B = get_state_space_matrices(order,theta)
@@ -78,18 +252,19 @@ def build_parallel_lmu(order,theta,hidden_dim,num_lmus=1):
 
     fft_H = K.constant(fft_H,dtype='complex64')
 
-    input = tf.keras.Input(shape=(23,22,114))
+
+    input = tf.keras.Input(shape=(23,2508))
     # reshaping input to flatten HxW dimensions
     x = tf.keras.layers.Reshape(target_shape=(23, 2508))(input)
     for i in range(num_lmus):
        x = add_lmu(x,fft_H,hidden_dim)
     # output classfication
     # flatten the concatenated hidden states
-    #x = tf.keras.layers.Flatten()(x)
+    x = tf.keras.layers.Flatten()(x)
     # actually, we only want the last hidden state
-    x = tf.keras.layers.Lambda(lambda p: p[:,-1,:])(x)
-    x = tf.keras.layers.Dense(1024)(x)
-    x = tf.keras.layers.Dense(256)(x)
+    #x = tf.keras.layers.Lambda(lambda p: p[:,-1,:])(x)
+    #x = tf.keras.layers.Dense(1024)(x)
+    #x = tf.keras.layers.Dense(256)(x)
     output = tf.keras.layers.Dense(1,activation='sigmoid')(x)
 
     model = tf.keras.Model(input, output)
@@ -112,8 +287,8 @@ def build_parallel_lmu(order,theta,hidden_dim,num_lmus=1):
     print('Parallel LMU model successfully built')
     return model
 
-model = build_parallel_lmu(40,50,140,num_lmus=3)
-print(model.predict(tf.random.normal(shape=(1,23,22,114),dtype=tf.float32),batch_size=1))
+model = build_lmu(40,50,128,num_lmus=3)
+print(model.predict_on_batch(tf.random.normal(shape=(2,23,2508),dtype=tf.float32)))
 
 
 trainable_count = int(
@@ -124,3 +299,6 @@ non_trainable_count = int(
 print('Total params: {:,}'.format(trainable_count + non_trainable_count))
 print('Trainable params: {:,}'.format(trainable_count))
 print('Non-trainable params: {:,}'.format(non_trainable_count))
+
+
+#converted = nengo_dl.Converter(model)
