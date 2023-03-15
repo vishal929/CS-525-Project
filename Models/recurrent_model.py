@@ -9,15 +9,6 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.keras import backend as K
 
-tf.compat.v1.enable_eager_execution(
-    config=None, device_policy=None, execution_mode=None
-)
-# TEMP FIX FOR SOME RUNTIME ISSUES
-import os
-os.environ['KMP_DUPLICATE_LIB_OK']='True'
-
-
-
 # LMU module definition in the Keras API
 class KerasLMU(tf.keras.layers.Layer):
     def __init__(self,order,theta,hidden_dim,trainable_A=False,trainable_B=False,use_em=False,use_eh=False):
@@ -34,26 +25,30 @@ class KerasLMU(tf.keras.layers.Layer):
         A,B = get_state_space_matrices(order,theta)
         A = tf.convert_to_tensor(A,dtype=tf.float32)
         B = tf.convert_to_tensor(B,dtype=tf.float32)
-        self.A = tf.Variable(initial_value=A,trainable=trainable_A)
-        self.B = tf.Variable(initial_value=B,trainable=trainable_B)
+        self.A = tf.Variable(initial_value=A,trainable=trainable_A,name='A_matrix')
+        self.B = tf.Variable(initial_value=B,trainable=trainable_B,name='B_vector')
         self.use_em=use_em
         self.use_eh = use_eh
         # weights for computing input state (e_x will be built at build time when we know input dim)
         if self.use_em:
             # weight for squashing prior memory
-            self.e_m = self.add_weight(shape=(order,1),initializer='glorot_uniform',trainable=True)
+            self.e_m = self.add_weight(shape=(order,1),initializer='glorot_uniform',trainable=True,name='mem_emb')
         if self.use_eh:
             # weight for squashing prior hidden state
-            self.e_h =self.add_weight(shape=(hidden_dim,1),initializer='glorot_uniform',trainable=True)
+            self.e_h =self.add_weight(shape=(hidden_dim,1),initializer='glorot_uniform',trainable=True,name='hidden_emb')
         # weight for computing portions of hidden states
         # W_h, W_m (W_x will be built at build time, when we know the input dim)
-        self.W_h = self.add_weight(shape=(hidden_dim,hidden_dim),initializer='glorot_uniform',trainable=True)
-        self.W_m = self.add_weight(shape=(hidden_dim,order),initializer='glorot_uniform',trainable=True)
+        self.W_h = self.add_weight(shape=(hidden_dim,hidden_dim),initializer='glorot_uniform',
+                                   trainable=True,name='hidden_weights')
+        self.W_m = self.add_weight(shape=(hidden_dim,order),initializer='glorot_uniform',
+                                   trainable=True, name='memory_weights')
 
     def build(self, input_shape):
         # need to create W_x and e_x here
-        self.W_x = self.add_weight(shape=(input_shape[-1],self.hidden_dim),initializer='glorot_uniform',trainable=True)
-        self.e_x = self.add_weight(shape=(input_shape[-1],1),initializer='glorot_uniform',trainable=True)
+        self.W_x = self.add_weight(shape=(input_shape[-1],self.hidden_dim),initializer='glorot_uniform',
+                                   trainable=True, name='input_weights')
+        self.e_x = self.add_weight(shape=(input_shape[-1],1),initializer='glorot_uniform'
+                                   ,trainable=True,name='input_emb')
 
     def call(self,inputs):
         # need to compute memories for each timestep
@@ -155,6 +150,43 @@ def add_lmu(input,fft_H,hidden_dim):
     #x = tf.keras.layers.Lambda(lambda p: p[:,-1,:])(x)
     return x
 
+def build_conv_lmu(order,theta,hidden_dim,num_lmus=1):
+    x = input = tf.keras.Input(shape=(23, 22,114))
+
+    # convolution to extract features from 22x114 input
+    # hope is that this will be more powerful and use less features than the Linear layer to squash inputs
+    x = tf.keras.layers.Conv2D()(x)
+    x = tf.keras.layers.Conv2D()(x)
+    x = tf.keras.layers.Conv2D()(x)
+    x = tf.keras.layers.AvgPool2D()(x)
+
+    for i in range(num_lmus):
+        x = KerasLMU(order, theta, hidden_dim)(x)
+
+    # obtaining only the last hidden layer output
+    x = tf.keras.layers.Lambda(lambda x: x[:, -1])(x)
+    output = tf.keras.layers.Dense(1, activation='sigmoid')(x)
+
+    model = tf.keras.Model(input, output)
+    # Finally, we compute the cross-entropy loss between true labels and predicted labels to account for
+    # the class imbalance between seizure and non-seizure depicting data
+    # loss_func = keras.losses.categorical_crossentropy
+    loss_func = tf.keras.losses.binary_crossentropy
+    optim = tf.keras.optimizers.RMSprop(learning_rate=0.0001)
+    metrics = [
+        tf.keras.metrics.TruePositives(name='tp'),
+        tf.keras.metrics.FalsePositives(name='fp'),
+        tf.keras.metrics.TrueNegatives(name='tn'),
+        tf.keras.metrics.FalseNegatives(name='fn'),
+        tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+        tf.keras.metrics.Precision(name='precision'),
+        tf.keras.metrics.Recall(name='recall'),
+        tf.keras.metrics.AUC(name='auc'),
+    ]
+    model.compile(loss=loss_func, optimizer=optim, metrics=metrics, run_eagerly=True)
+    print('Conv LMU model successfully built')
+    return model
+
 # this LMU consists of 3 lmu units of hidden_dim followed by a dense output layer with sigmoid binary output
 def build_lmu(order,theta,hidden_dim,num_lmus=1):
     x=input = tf.keras.Input(shape=(23,2508))
@@ -183,7 +215,7 @@ def build_lmu(order,theta,hidden_dim,num_lmus=1):
         tf.keras.metrics.Recall(name='recall'),
         tf.keras.metrics.AUC(name='auc'),
     ]
-    model.compile(loss=loss_func, optimizer=optim, metrics=metrics,run_eagerly=True)
+    model.compile(loss=loss_func, optimizer=optim, metrics=metrics)
     print('LMU model successfully built')
     return model
 

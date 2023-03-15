@@ -2,10 +2,6 @@ import tensorflow as tf
 from tensorflow import keras
 import nengo_dl
 
-# TEMP FIX FOR SOME RUNTIME ISSUES
-import os
-os.environ['KMP_DUPLICATE_LIB_OK']='True'
-
 # around 92k params
 # Building the convolutional neural network:
 def buildModel():
@@ -82,7 +78,7 @@ def convert_snn():
     print(converted.verify())
     return converted
 
-converted = convert_snn()
+#converted = convert_snn()
 
 #with nengo_dl.Simulator(converted.net) as sim:
 #    sim.run(3)
