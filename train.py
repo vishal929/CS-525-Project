@@ -46,8 +46,11 @@ print('training, batch_size = ' + str(batch_size) + ', leave_out=' + str(leave_o
 model_saved_name = str(leave_out) + '----' + str(window_size)
 
 tf_dataset = data_util.tf_dataset('train', window_size=window_size, leave_out=leave_out)
-val_set = data_util.tf_dataset('val')
-#model = model.buildModel()
-model = recurrent_model.build_lmu(256,784,256,num_lmus=2)
+val_set = data_util.tf_dataset('val',window_size=window_size,leave_out=leave_out)
+
+if window_size==1:
+    model = model.buildModel()
+else:
+    model = recurrent_model.build_lmu(256,784,256,num_lmus=2)
 
 trained_model = train(model, tf_dataset, val_set, model_saved_name, batch_size=batch_size)

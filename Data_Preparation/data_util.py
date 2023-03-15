@@ -158,6 +158,3 @@ count = test.reduce(0, lambda x,_: x+1).numpy()
 print(count)
 '''
 
-
-test = tf_dataset(split='val',window_size=12)
-print(next(iter(test)))
