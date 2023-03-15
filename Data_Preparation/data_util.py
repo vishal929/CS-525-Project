@@ -112,16 +112,16 @@ def tf_dataset(split='train',window_size=1,leave_out='chb01'):
         #dataset = tf.data.Dataset.list_files('./Processed_Data/'+leave_out+'/'+str(window_size)+'*.npy')
     # converting filename to batched numpy array and batched label tensors
     dataset = dataset.map(lambda x: tf.py_function(npy_to_tf,inp=[x],Tout=[tf.float32,tf.uint8]),
-                          num_parallel_calls=tf.data.AUTOTUNE)
+                          num_parallel_calls=4)
     # taking the batched data and batched labels and flattening them (preserves order)
     examples = dataset.flat_map(lambda example,label: tf.data.Dataset.from_tensor_slices(example))
     # applying stft transform to our examples
-    examples = examples.map(stft_samples,num_parallel_calls=tf.data.AUTOTUNE)
+    examples = examples.map(stft_samples,num_parallel_calls=4)
     # need to squeeze the extra dimension if needed
-    examples = examples.map(tf.squeeze,num_parallel_calls=tf.data.AUTOTUNE)
+    examples = examples.map(tf.squeeze,num_parallel_calls=4)
     # if our window size is 1, we need to explicitly set a channel to process like an image
     if window_size == 1:
-        examples= examples.map(lambda example: tf.expand_dims(example,axis=0),num_parallel_calls=tf.data.AUTOTUNE)
+        examples= examples.map(lambda example: tf.expand_dims(example,axis=0),num_parallel_calls=4)
     labels = dataset.flat_map(lambda example,label: tf.data.Dataset.from_tensor_slices(label))
     # need to provide labels as a one-hot-encoding in keras api
     #labels = labels.map(lambda label: tf.one_hot(label,depth=2),num_parallel_calls=tf.data.AUTOTUNE)
@@ -159,5 +159,5 @@ print(count)
 '''
 
 
-#test = tf_dataset(split='val',window_size=1)
-#print(next(iter(test)))
+test = tf_dataset(split='val',window_size=12)
+print(next(iter(test)))

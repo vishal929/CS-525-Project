@@ -191,7 +191,7 @@ def build_conv_lmu(order,theta,hidden_dim,num_lmus=1):
 def build_lmu(order,theta,hidden_dim,num_lmus=1):
     x=input = tf.keras.Input(shape=(23,2508))
     # reshaping input to flatten HxW dimensions
-    #x = tf.keras.layers.Reshape(target_shape=(23, 2508))(input)
+    x = tf.keras.layers.Reshape(target_shape=(23, 2508))(input)
     for i in range(num_lmus):
        x = KerasLMU(order,theta,hidden_dim)(x)
 
@@ -281,3 +281,5 @@ print('Non-trainable params: {:,}'.format(non_trainable_count))
 
 #converted = nengo_dl.Converter(model)
 '''
+
+#model = build_lmu(256,784,256,num_lmus=2)
