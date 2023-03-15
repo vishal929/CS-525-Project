@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow import keras
-import nengo_dl
+#import nengo_dl
 
 # around 92k params
 # Building the convolutional neural network:
