@@ -26,7 +26,7 @@ def train(model, tf_dataset, val_set, model_save_name, batch_size=32):
                                                       save_best_only=True,
                                                       monitor='val_loss')
     # batching and shuffling
-    tf_dataset = tf_dataset.shuffle(buffer_size=1000).batch(batch_size, num_parallel_calls=4)
+    tf_dataset = tf_dataset.shuffle(buffer_size=200000).batch(batch_size, num_parallel_calls=4)
     val_set = val_set.batch(batch_size, num_parallel_calls=4)
     # train_batch_size = ?, steps_per_epoch should be num_samples // train_batch_size
     # val_batch_size = ?, validation_steps should be num_val_samples // val_batch_size
