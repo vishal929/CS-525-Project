@@ -26,7 +26,7 @@ def train(model, tf_dataset, val_set, model_save_name, batch_size=32):
                                                       save_best_only=True,
                                                       monitor='val_loss')
     # batching and shuffling
-    tf_dataset = tf_dataset.shuffle(buffer_size=200000).batch(batch_size, num_parallel_calls=4)
+    tf_dataset = tf_dataset.shuffle(buffer_size=100000).batch(batch_size, num_parallel_calls=4)
     val_set = val_set.batch(batch_size, num_parallel_calls=4)
     # train_batch_size = ?, steps_per_epoch should be num_samples // train_batch_size
     # val_batch_size = ?, validation_steps should be num_val_samples // val_batch_size
@@ -40,7 +40,10 @@ print(tf.config.get_visible_devices())
 
 # printing task before training
 window_size = 12
-batch_size = 32
+if window_size==1:
+    batch_size = 32768
+else:
+    batch_size = 8192
 leave_out = 'chb01'
 print('training, batch_size = ' + str(batch_size) + ', leave_out=' + str(leave_out) + ', win_size: ' + str(window_size))
 model_saved_name = str(leave_out) + '----' + str(window_size)
