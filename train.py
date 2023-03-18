@@ -16,12 +16,11 @@ def train(model, tf_dataset, val_set, model_save_name, batch_size=32):
     early_stop = tf.keras.callbacks.EarlyStopping(
         patience=5
     )
-    # we want to save the weights of the model while training
-    checkpoint_path = os.path.join(ROOT_DIR, 'Trained Models', model_save_name + '.ckpt')
+    # we want to save the state of the model while training (we save the entire model to allow for continuing training)
+    checkpoint_path = os.path.join(ROOT_DIR, 'Trained Models', model_save_name)
 
     # we only save the model with the best validation loss seen so far
     save_weights = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
-                                                      save_weights_only=True,
                                                       verbose=1,
                                                       save_best_only=True,
                                                       monitor='val_loss')
@@ -51,9 +50,15 @@ model_saved_name = str(leave_out) + '----' + str(window_size)
 tf_dataset = data_util.tf_dataset('train', window_size=window_size, leave_out=leave_out)
 val_set = data_util.tf_dataset('val',window_size=window_size,leave_out=leave_out)
 
-if window_size==1:
-    model = model.buildModel()
+# check if we are continuing training
+# if we are continuing, load the model, otherwise create a new one
+possible_checkpoint =os.path.join(ROOT_DIR, 'Trained Models', model_saved_name)
+if os.path.exists(possible_checkpoint):
+    model = tf.keras.models.load_model(possible_checkpoint)
 else:
-    model = recurrent_model.build_lmu(256,784,256,num_lmus=2)
+    if window_size==1:
+        model = model.buildModel()
+    else:
+        model = recurrent_model.build_lmu(256,784,256,num_lmus=2)
 
 trained_model = train(model, tf_dataset, val_set, model_saved_name, batch_size=batch_size)
