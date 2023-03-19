@@ -84,7 +84,7 @@ class KerasLMU(tf.keras.layers.Layer):
             hidden_act = tf.matmul(self.W_h,last_hidden)
             memory_act = tf.matmul(self.W_m,memory)
             # update hidden state for this timestep
-            hidden = tf.nn.relu(tf.add(in_act,tf.add(hidden_act,memory_act))) #batch,hidden_dim,1
+            hidden = tf.nn.leaky_relu(tf.add(in_act,tf.add(hidden_act,memory_act))) #batch,hidden_dim,1
             # transpose to get (batch,1,hidden_dim)
             hiddens = hiddens.write(i,tf.transpose(hidden,perm=[2,0,1]))
         # concatenating along time dimension to get (time,batch,hidden_dim)
@@ -130,7 +130,7 @@ def build_H_parallel(A,B,sequence_length):
     return H,fft_H
 
 def add_lmu(input,fft_H,hidden_dim):
-    x = tf.keras.layers.Dense(1, activation='relu')(input)
+    x = tf.keras.layers.Dense(1, activation='leaky_relu')(input)
     #print(x.shape)
     x = tf.keras.layers.Permute((2,1),input_shape=(23,1))(x)
     # fft on the input embedding
@@ -145,7 +145,7 @@ def add_lmu(input,fft_H,hidden_dim):
     x=tf.keras.layers.Lambda(lambda p: p[:,:,:-1])(x)
     x = tf.keras.layers.Permute((2,1),input_shape=(10,23))(x)
     x = tf.keras.layers.Concatenate(axis=-1)([input, x])
-    x = tf.keras.layers.Dense(hidden_dim, activation='relu')(x)
+    x = tf.keras.layers.Dense(hidden_dim, activation='leaky_relu')(x)
     # only want the last hidden output, not all of them
     #x = tf.keras.layers.Lambda(lambda p: p[:,-1,:])(x)
     return x
@@ -162,7 +162,7 @@ def build_lmu(order,theta,hidden_dim,num_lmus=1):
 
     # obtaining only the last hidden layer output
     x = tf.keras.layers.Lambda(lambda x: x[:,-1])(x)
-    output = tf.keras.layers.Dense(1)(x)
+    output = tf.keras.layers.Dense(1,activation=tf.nn.sigmoid)(x)
 
     model = tf.keras.Model(input, output)
     # Finally, we compute the cross-entropy loss between true labels and predicted labels to account for
