@@ -175,7 +175,7 @@ def build_lmu(order,theta,hidden_dim,num_lmus=1):
         tf.keras.metrics.FalsePositives(name='fp', thresholds=0),
         tf.keras.metrics.TrueNegatives(name='tn', thresholds=0),
         tf.keras.metrics.FalseNegatives(name='fn', thresholds=0),
-        tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+        tf.keras.metrics.BinaryAccuracy(name='accuracy', threshold=0),
         tf.keras.metrics.Precision(name='precision', thresholds=0),
         tf.keras.metrics.Recall(name='recall', thresholds=0),
         tf.keras.metrics.AUC(name='auc', from_logits=True),
