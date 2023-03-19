@@ -40,13 +40,13 @@ def buildModel():
     x = keras.layers.Dropout(0.5)(x)
     # Second fully connected layerhas an output size of 2 and applies the softmax activation function
     #output = keras.layers.Dense(units=2, activation=tf.nn.softmax)(x)
-    output = keras.layers.Dense(units=1, activation=tf.nn.sigmoid)(x)
+    output = keras.layers.Dense(units=1)(x)
 
     model = keras.Model(input, output)
     # Finally, we compute the cross-entropy loss between true labels and predicted labels to account for
     # the class imbalance between seizure and non-seizure depicting data
     #loss_func = keras.losses.categorical_crossentropy
-    loss_func = keras.losses.binary_crossentropy
+    loss_func = keras.losses.binary_crossentropy(from_logits=True)
     optim = keras.optimizers.RMSprop(learning_rate=0.0001)
     metrics = [
         keras.metrics.TruePositives(name='tp'),

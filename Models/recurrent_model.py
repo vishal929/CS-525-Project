@@ -150,42 +150,7 @@ def add_lmu(input,fft_H,hidden_dim):
     #x = tf.keras.layers.Lambda(lambda p: p[:,-1,:])(x)
     return x
 
-def build_conv_lmu(order,theta,hidden_dim,num_lmus=1):
-    x = input = tf.keras.Input(shape=(23, 22,114))
 
-    # convolution to extract features from 22x114 input
-    # hope is that this will be more powerful and use less features than the Linear layer to squash inputs
-    x = tf.keras.layers.Conv2D()(x)
-    x = tf.keras.layers.Conv2D()(x)
-    x = tf.keras.layers.Conv2D()(x)
-    x = tf.keras.layers.AvgPool2D()(x)
-
-    for i in range(num_lmus):
-        x = KerasLMU(order, theta, hidden_dim)(x)
-
-    # obtaining only the last hidden layer output
-    x = tf.keras.layers.Lambda(lambda x: x[:, -1])(x)
-    output = tf.keras.layers.Dense(1, activation='sigmoid')(x)
-
-    model = tf.keras.Model(input, output)
-    # Finally, we compute the cross-entropy loss between true labels and predicted labels to account for
-    # the class imbalance between seizure and non-seizure depicting data
-    # loss_func = keras.losses.categorical_crossentropy
-    loss_func = tf.keras.losses.binary_crossentropy
-    optim = tf.keras.optimizers.RMSprop(learning_rate=0.0001)
-    metrics = [
-        tf.keras.metrics.TruePositives(name='tp'),
-        tf.keras.metrics.FalsePositives(name='fp'),
-        tf.keras.metrics.TrueNegatives(name='tn'),
-        tf.keras.metrics.FalseNegatives(name='fn'),
-        tf.keras.metrics.BinaryAccuracy(name='accuracy'),
-        tf.keras.metrics.Precision(name='precision'),
-        tf.keras.metrics.Recall(name='recall'),
-        tf.keras.metrics.AUC(name='auc'),
-    ]
-    model.compile(loss=loss_func, optimizer=optim, metrics=metrics, run_eagerly=True)
-    print('Conv LMU model successfully built')
-    return model
 
 # this LMU consists of 3 lmu units of hidden_dim followed by a dense output layer with sigmoid binary output
 def build_lmu(order,theta,hidden_dim,num_lmus=1):
@@ -197,13 +162,13 @@ def build_lmu(order,theta,hidden_dim,num_lmus=1):
 
     # obtaining only the last hidden layer output
     x = tf.keras.layers.Lambda(lambda x: x[:,-1])(x)
-    output = tf.keras.layers.Dense(1,activation='sigmoid')(x)
+    output = tf.keras.layers.Dense(1)(x)
 
     model = tf.keras.Model(input, output)
     # Finally, we compute the cross-entropy loss between true labels and predicted labels to account for
     # the class imbalance between seizure and non-seizure depicting data
     # loss_func = keras.losses.categorical_crossentropy
-    loss_func = tf.keras.losses.binary_crossentropy
+    loss_func = tf.keras.losses.binary_crossentropy(from_logits=True)
     optim = tf.keras.optimizers.RMSprop(learning_rate=0.0001)
     metrics = [
         tf.keras.metrics.TruePositives(name='tp'),
