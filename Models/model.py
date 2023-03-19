@@ -43,23 +43,23 @@ def buildModel():
     x = keras.layers.Dropout(0.5)(x)
     # Second fully connected layerhas an output size of 2 and applies the softmax activation function
     #output = keras.layers.Dense(units=2, activation=tf.nn.softmax)(x)
-    output = keras.layers.Dense(units=1, activation = tf.nn.sigmoid)(x)
+    output = keras.layers.Dense(units=1)(x)
 
     model = keras.Model(input, output)
     # Finally, we compute the cross-entropy loss between true labels and predicted labels to account for
     # the class imbalance between seizure and non-seizure depicting data
     #loss_func = keras.losses.categorical_crossentropy
-    loss_func = keras.losses.BinaryCrossentropy()
+    loss_func = keras.losses.BinaryCrossentropy(from_logits=True)
     optim = keras.optimizers.RMSprop(learning_rate=0.0001)
     metrics = [
-        keras.metrics.TruePositives(name='tp'),
-        keras.metrics.FalsePositives(name='fp'),
-        keras.metrics.TrueNegatives(name='tn'),
-        keras.metrics.FalseNegatives(name='fn'),
+        keras.metrics.TruePositives(name='tp',thresholds=0),
+        keras.metrics.FalsePositives(name='fp',thresholds=0),
+        keras.metrics.TrueNegatives(name='tn',thresholds=0),
+        keras.metrics.FalseNegatives(name='fn',thresholds=0),
         keras.metrics.BinaryAccuracy(name='accuracy'),
-        keras.metrics.Precision(name='precision'),
-        keras.metrics.Recall(name='recall'),
-        keras.metrics.AUC(name='auc'),
+        keras.metrics.Precision(name='precision',thresholds=0),
+        keras.metrics.Recall(name='recall',thresholds=0),
+        keras.metrics.AUC(name='auc',from_logits=True),
     ]
     model.compile(loss=loss_func, optimizer=optim, metrics=metrics, )
     print('CNN model successfully built')
