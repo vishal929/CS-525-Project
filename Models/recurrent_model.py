@@ -168,7 +168,7 @@ def build_lmu(order,theta,hidden_dim,num_lmus=1):
     # Finally, we compute the cross-entropy loss between true labels and predicted labels to account for
     # the class imbalance between seizure and non-seizure depicting data
     # loss_func = keras.losses.categorical_crossentropy
-    loss_func = tf.keras.losses.binary_crossentropy(from_logits=True)
+    loss_func = tf.keras.losses.BinaryCrossentropy(from_logits=True)
     optim = tf.keras.optimizers.RMSprop(learning_rate=0.0001)
     metrics = [
         tf.keras.metrics.TruePositives(name='tp'),

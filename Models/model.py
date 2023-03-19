@@ -46,7 +46,7 @@ def buildModel():
     # Finally, we compute the cross-entropy loss between true labels and predicted labels to account for
     # the class imbalance between seizure and non-seizure depicting data
     #loss_func = keras.losses.categorical_crossentropy
-    loss_func = keras.losses.binary_crossentropy(from_logits=True)
+    loss_func = keras.losses.BinaryCrossentropy(from_logits=True)
     optim = keras.optimizers.RMSprop(learning_rate=0.0001)
     metrics = [
         keras.metrics.TruePositives(name='tp'),
