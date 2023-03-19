@@ -14,7 +14,7 @@ but Keras has built-in methods for this
 def train(model, tf_dataset, val_set, model_save_name, batch_size=32):
     # want to early stop if the validation loss does not improve for 5 consecutive epochs
     early_stop = tf.keras.callbacks.EarlyStopping(
-        patience=5
+        patience=20
     )
     # we want to save the state of the model while training (we save the entire model to allow for continuing training)
     checkpoint_path = os.path.join(ROOT_DIR, 'Trained Models', model_save_name)
@@ -29,7 +29,7 @@ def train(model, tf_dataset, val_set, model_save_name, batch_size=32):
     val_set = val_set.batch(batch_size, num_parallel_calls=4)
     # train_batch_size = ?, steps_per_epoch should be num_samples // train_batch_size
     # val_batch_size = ?, validation_steps should be num_val_samples // val_batch_size
-    trained_model = model.fit(tf_dataset, epochs=50, verbose=2, validation_data=val_set, callbacks=[early_stop,
+    trained_model = model.fit(tf_dataset, epochs=300, verbose=2, validation_data=val_set, callbacks=[early_stop,
                                                                                                     save_weights])
     return trained_model
 
