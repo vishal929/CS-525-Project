@@ -70,6 +70,7 @@ def load_model(model_path):
     model.load_weights(model_path)
 
 # function that converts this keras model into an snn via nengo_converter
+'''
 def convert_snn():
     model = buildModel()
     # need to remove dropout layers because they are not supported in nengo
@@ -77,7 +78,7 @@ def convert_snn():
     converted = nengo_dl.Converter(model,max_to_avg_pool=True,inference_only=True)
     print(converted.verify())
     return converted
-
+'''
 #converted = convert_snn()
 
 #with nengo_dl.Simulator(converted.net) as sim:
