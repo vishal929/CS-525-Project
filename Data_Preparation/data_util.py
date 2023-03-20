@@ -150,11 +150,62 @@ def get_class_counts(tf_dataset):
     zeros = total-ones
     return zeros,ones
 
-''' EXAMPLE OF HOW TO COUNT IN THE DATASET (we need eager execution due to transformations)'''
-'''
-test = tf_dataset(split='val')
-print(get_class_counts(test))
-count = test.reduce(0, lambda x,_: x+1).numpy()
-print(count)
-'''
+
+# this gets train,val,test splits on the PATIENT-level
+# i.e, if we specify 'chb01' we get first 80% as train, consecutive 10% as val, and latter 10% as test for the specific patient chb01
+def get_patient_level_data(window_size=1,patient='chb01'):
+    # grabbing files related to this patient
+    train_glob_path = os.path.join(ROOT_DIR, 'Data_Preparation', 'Processed_Data', patient
+                                     , str(window_size) + '-*train.npy')
+    val_glob_path = os.path.join(ROOT_DIR, 'Data_Preparation', 'Processed_Data', patient
+                                     , str(window_size) + '-*val.npy')
+
+    # train_dataset contains files for the first 75% of examples
+    train_dataset = tf.data.Dataset.list_files(train_glob_path,shuffle=False)
+    # val_dataset contains files for the latter 25% of examples from a different time period
+    val_dataset = tf.data.Dataset.list_files(val_glob_path,shuffle=False)
+
+    dataset = train_dataset.concatenate(val_dataset)
+    # converting filename to batched numpy array and batched label tensors
+    dataset = dataset.map(lambda x: tf.py_function(npy_to_tf, inp=[x], Tout=[tf.float32, tf.uint8]),
+                          num_parallel_calls=4)
+    # taking the batched data and batched labels and flattening them (preserves order)
+    examples = dataset.flat_map(lambda example, label: tf.data.Dataset.from_tensor_slices(example))
+    # applying stft transform to our examples
+    examples = examples.map(stft_samples, num_parallel_calls=4)
+    # need to squeeze the extra dimension if needed
+    examples = examples.map(tf.squeeze, num_parallel_calls=4)
+    # if our window size is 1, we need to explicitly set a channel to process like an image
+    if window_size == 1:
+        examples = examples.map(lambda example: tf.expand_dims(example, axis=0), num_parallel_calls=4)
+    labels = dataset.flat_map(lambda example, label: tf.data.Dataset.from_tensor_slices(label))
+
+    # need to provide labels as a one-hot-encoding in keras api
+    # labels = labels.map(lambda label: tf.one_hot(label,depth=2),num_parallel_calls=tf.data.AUTOTUNE)
+    # zipping together flattened examples to form final dataset
+    dataset = tf.data.Dataset.zip((examples, labels))
+
+    # counting examples so that we can make the split (order is preserved)
+    first_count,second_count = get_class_counts(dataset)
+    total_num = first_count+second_count
+
+    train_size = int(0.8 * total_num.numpy())
+    val_size = int(0.1 * total_num.numpy())
+    test_size = (total_num - (train_size+val_size)).numpy()
+
+    train = dataset.take(train_size)
+    val = dataset.skip(train_size).take(val_size)
+    test = dataset.skip(train_size+val_size).take(test_size)
+
+
+    # adding sample weighting for imbalances only for the training set
+    # getting imbalance count
+    num_interictal, num_ictal = get_class_counts(train)
+    imbalance = -(num_interictal // -num_ictal)
+    ictals = train.filter(lambda example, label: label == 1)
+    ictals = ictals.map(lambda example, label: (example, label, imbalance))
+    interictals = train.filter(lambda example, label: label == 0)
+    interictals = interictals.map(lambda example, label: (example, label, 1))
+    train = ictals.concatenate(interictals)
+    return train,val,test
 

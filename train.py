@@ -37,18 +37,34 @@ def train(model, tf_dataset, val_set, model_save_name, batch_size=32):
 # print gpu availability
 print(tf.config.get_visible_devices())
 
+# flag if we are training using leave-out-one patient or if we are training on a specific patient with 80/10/10 split
+specific_patient = False
+
 # printing task before training
 window_size = 1
 if window_size==1:
     batch_size = 32768
 else:
     batch_size = 8192
-leave_out = 'chb01'
-print('training, batch_size = ' + str(batch_size) + ', leave_out=' + str(leave_out) + ', win_size: ' + str(window_size))
-model_saved_name = str(leave_out) + '----' + str(window_size)
 
-tf_dataset = data_util.tf_dataset('train', window_size=window_size, leave_out=leave_out)
-val_set = data_util.tf_dataset('val',window_size=window_size,leave_out=leave_out)
+# leave_out/specific patient
+# (if specific patient flag is set, we will train,val,test for this patient)
+# (if flag is not set, we will leave out this patient for testing and validation and strictly test on it)
+leave_out = 'chb01'
+
+if specific_patient:
+    print('training, batch_size = ' + str(batch_size) + ', specific_patient=' + str(leave_out) + ', win_size: ' + str(
+        window_size))
+else:
+    print('training, batch_size = ' + str(batch_size) + ', leave_out=' + str(leave_out) + ', win_size: ' + str(window_size))
+
+model_saved_name = str(leave_out) + '----' + str(window_size) + '----specific_patient:' + str(specific_patient)
+
+if specific_patient:
+    tf_dataset,val_set,_ = data_util.get_patient_level_data(window_size=window_size,patient=leave_out)
+else:
+    tf_dataset = data_util.tf_dataset('train', window_size=window_size, leave_out=leave_out)
+    val_set = data_util.tf_dataset('val',window_size=window_size,leave_out=leave_out)
 
 # check if we are continuing training
 # if we are continuing, load the model, otherwise create a new one
