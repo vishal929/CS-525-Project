@@ -38,7 +38,7 @@ def train(model, tf_dataset, val_set, model_save_name, batch_size=32):
 print(tf.config.get_visible_devices())
 
 # printing task before training
-window_size = 12
+window_size = 1
 if window_size==1:
     batch_size = 32768
 else:
