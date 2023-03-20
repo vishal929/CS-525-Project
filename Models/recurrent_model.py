@@ -162,23 +162,23 @@ def build_lmu(order,theta,hidden_dim,num_lmus=1):
 
     # obtaining only the last hidden layer output
     x = tf.keras.layers.Lambda(lambda x: x[:,-1])(x)
-    output = tf.keras.layers.Dense(1)(x)
+    output = tf.keras.layers.Dense(1,activation=tf.nn.sigmoid)(x)
 
     model = tf.keras.Model(input, output)
     # Finally, we compute the cross-entropy loss between true labels and predicted labels to account for
     # the class imbalance between seizure and non-seizure depicting data
     # loss_func = keras.losses.categorical_crossentropy
-    loss_func = tf.keras.losses.BinaryCrossentropy(from_logits=True)
-    optim = tf.keras.optimizers.RMSprop(learning_rate=0.0001)
+    loss_func = tf.keras.losses.BinaryCrossentropy()
+    optim = tf.keras.optimizers.RMSprop(learning_rate=0.001)
     metrics = [
-        tf.keras.metrics.TruePositives(name='tp', thresholds=0),
-        tf.keras.metrics.FalsePositives(name='fp', thresholds=0),
-        tf.keras.metrics.TrueNegatives(name='tn', thresholds=0),
-        tf.keras.metrics.FalseNegatives(name='fn', thresholds=0),
-        tf.keras.metrics.BinaryAccuracy(name='accuracy', threshold=0),
-        tf.keras.metrics.Precision(name='precision', thresholds=0),
-        tf.keras.metrics.Recall(name='recall', thresholds=0),
-        tf.keras.metrics.AUC(name='auc', from_logits=True),
+        tf.keras.metrics.TruePositives(name='tp'),
+        tf.keras.metrics.FalsePositives(name='fp'),
+        tf.keras.metrics.TrueNegatives(name='tn'),
+        tf.keras.metrics.FalseNegatives(name='fn'),
+        tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+        tf.keras.metrics.Precision(name='precision'),
+        tf.keras.metrics.Recall(name='recall'),
+        tf.keras.metrics.AUC(name='auc'),
     ]
     model.compile(loss=loss_func, optimizer=optim, metrics=metrics)
     print('LMU model successfully built')
