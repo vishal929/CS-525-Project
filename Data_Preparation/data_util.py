@@ -165,38 +165,57 @@ def get_patient_level_data(window_size=1,patient='chb01'):
     # val_dataset contains files for the latter 25% of examples from a different time period
     val_dataset = tf.data.Dataset.list_files(val_glob_path,shuffle=False)
 
-    dataset = train_dataset.concatenate(val_dataset)
     # converting filename to batched numpy array and batched label tensors
-    dataset = dataset.map(lambda x: tf.py_function(npy_to_tf, inp=[x], Tout=[tf.float32, tf.uint8]),
+    train_dataset = train_dataset.map(lambda x: tf.py_function(npy_to_tf, inp=[x], Tout=[tf.float32, tf.uint8]),
                           num_parallel_calls=4)
+    val_dataset = val_dataset.map(lambda x: tf.py_function(npy_to_tf, inp=[x], Tout=[tf.float32, tf.uint8]),
+                                      num_parallel_calls=4)
     # taking the batched data and batched labels and flattening them (preserves order)
-    examples = dataset.flat_map(lambda example, label: tf.data.Dataset.from_tensor_slices(example))
+    train_examples = train_dataset.flat_map(lambda example, label: tf.data.Dataset.from_tensor_slices(example))
+    val_examples = val_dataset.flat_map(lambda example, label: tf.data.Dataset.from_tensor_slices(example))
     # applying stft transform to our examples
-    examples = examples.map(stft_samples, num_parallel_calls=4)
+    train_examples = train_examples.map(stft_samples, num_parallel_calls=4)
+    val_examples = val_examples.map(stft_samples, num_parallel_calls=4)
     # need to squeeze the extra dimension if needed
-    examples = examples.map(tf.squeeze, num_parallel_calls=4)
+    train_examples = train_examples.map(tf.squeeze, num_parallel_calls=4)
+    val_examples = val_examples.map(tf.squeeze, num_parallel_calls=4)
     # if our window size is 1, we need to explicitly set a channel to process like an image
     if window_size == 1:
-        examples = examples.map(lambda example: tf.expand_dims(example, axis=0), num_parallel_calls=4)
-    labels = dataset.flat_map(lambda example, label: tf.data.Dataset.from_tensor_slices(label))
+        train_examples = train_examples.map(lambda example: tf.expand_dims(example, axis=0), num_parallel_calls=4)
+        val_examples = val_examples.map(lambda example: tf.expand_dims(example, axis=0), num_parallel_calls=4)
+    train_labels = train_dataset.flat_map(lambda example, label: tf.data.Dataset.from_tensor_slices(label))
+    val_labels = train_dataset.flat_map(lambda example, label: tf.data.Dataset.from_tensor_slices(label))
 
     # need to provide labels as a one-hot-encoding in keras api
     # labels = labels.map(lambda label: tf.one_hot(label,depth=2),num_parallel_calls=tf.data.AUTOTUNE)
     # zipping together flattened examples to form final dataset
-    dataset = tf.data.Dataset.zip((examples, labels))
+    train = tf.data.Dataset.zip((train_examples, train_labels))
+    val = tf.data.Dataset.zip((val_examples, val_labels))
 
-    # counting examples so that we can make the split (order is preserved)
-    first_count,second_count = get_class_counts(dataset)
-    total_num = first_count+second_count
+    total_count = train.reduce(0,lambda y,_:y+1)
+    total_count +=val.reduce(0,lambda y,_:y+1)
 
-    train_size = int(0.8 * total_num.numpy())
-    val_size = int(0.1 * total_num.numpy())
-    test_size = (total_num - (train_size+val_size)).numpy()
+    # train dataset contains 75% of examples
+    # val contains 25% of examples
+    # firstly, we will transfer 5% of the total as interictal data to the train_dataset
+    interictal_val = val.filter(lambda example,label: label==0)
+    ictal_val = val.filter(lambda example,label: label==1)
+    val_interictal_count = interictal_val.reduce(0,lambda y,_:y+1)
+    val_ictal_count  = ictal_val.reduce(0,lambda y,_:y+1)
 
-    train = dataset.take(train_size)
-    val = dataset.skip(train_size).take(val_size)
-    test = dataset.skip(train_size+val_size).take(test_size)
+    train = train.concatenate(interictal_val.take(int(0.05 * total_count.numpy())))
+    interictal_val = interictal_val.skip(int(0.05*total_count.numpy()))
+    val_interictal_count -= int(0.05 * total_count.numpy())
 
+    # splitting ictal and interictal now in half and that will become our val and test sets
+    val = ictal_val.take(int(0.5*val_ictal_count.numpy()))
+    val = val.concatenate(interictal_val.take(int(0.5*val_interictal_count.numpy())))
+    ictal_val = ictal_val.skip(int(0.5*val_ictal_count.numpy()))
+    interictal_val = interictal_val.skip(int(0.5*val_interictal_count.numpy()))
+
+    ictal_remaining = (val_ictal_count-int(0.5*val_ictal_count.numpy())).numpy()
+    interictal_remaining = (val_interictal_count - int(0.5*val_interictal_count.numpy())).numpy()
+    test = ictal_val.take(ictal_remaining).concatenate(interictal_val.take(interictal_remaining))
 
     # adding sample weighting for imbalances only for the training set
     # getting imbalance count
@@ -209,3 +228,7 @@ def get_patient_level_data(window_size=1,patient='chb01'):
     train = ictals.concatenate(interictals)
     return train,val,test
 
+#train,val,test = get_patient_level_data()
+#print(len(list(iter(val.filter(lambda example,label:label==1)))))
+#print(len(list(iter(train.filter(lambda example,label,weight:label==1)))))
+#print(len(list(iter(test.filter(lambda example,label:label==1)))))
