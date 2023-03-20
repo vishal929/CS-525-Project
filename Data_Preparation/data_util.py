@@ -128,7 +128,7 @@ def tf_dataset(split='train',window_size=1,leave_out='chb01'):
     # zipping together flattened examples to form final dataset
     dataset = tf.data.Dataset.zip((examples,labels))
     # adding sample weighting for imbalances only for the training set
-    if split=='train' or split=='val':
+    if split=='train' :
         # getting imbalance count
         num_interictal, num_ictal = get_class_counts(dataset)
         imbalance = -(num_interictal//-num_ictal)
