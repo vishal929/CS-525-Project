@@ -49,6 +49,8 @@ class KerasLMU(tf.keras.layers.Layer):
                                    trainable=True, name='input_weights')
         self.e_x = self.add_weight(shape=(input_shape[-1],1),initializer='glorot_uniform'
                                    ,trainable=True,name='input_emb')
+        # shape is batch x timestep x H x W
+        self.timesteps = input_shape[-3]
 
     def call(self,inputs):
         # need to compute memories for each timestep
@@ -60,7 +62,7 @@ class KerasLMU(tf.keras.layers.Layer):
         hiddens =tf.TensorArray(dtype=tf.float32,size=0,dynamic_size=True,clear_after_read=False)
         hiddens = hiddens.write(0,tf.zeros((1,batch,self.hidden_dim),dtype=tf.float32))
         # iterating over the time dimension
-        for i in range(1,timestep):
+        for i in range(1,self.timesteps+1):
             # transpose to get (batch,hidden_dim,1)
             last_hidden = tf.transpose(hiddens.read(i-1),perm=[1,2,0])
             feature = inputs[:,i,:]
@@ -89,6 +91,8 @@ class KerasLMU(tf.keras.layers.Layer):
             hiddens = hiddens.write(i,tf.transpose(hidden,perm=[2,0,1]))
         # concatenating along time dimension to get (time,batch,hidden_dim)
         hiddens = hiddens.concat()
+        # removing the first timestep feature, since it was a dummy of zero values
+        hiddens = hiddens[1:,:,:]
         # tranpose to get (batch,time,hidden_dim)
         hiddens = tf.transpose(hiddens,perm=[1,0,2])
         return hiddens
