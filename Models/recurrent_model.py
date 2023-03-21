@@ -65,7 +65,7 @@ class KerasLMU(tf.keras.layers.Layer):
         for i in range(1,self.timesteps+1):
             # transpose to get (batch,hidden_dim,1)
             last_hidden = tf.transpose(hiddens.read(i-1),perm=[1,2,0])
-            feature = inputs[:,i,:]
+            feature = inputs[:,i-1,:]
             # computing u
             u = tf.matmul(feature,self.e_x)
             if self.use_eh:
