@@ -49,8 +49,8 @@ class KerasLMU(tf.keras.layers.Layer):
                                    trainable=True, name='input_weights')
         self.e_x = self.add_weight(shape=(input_shape[-1],1),initializer='glorot_uniform'
                                    ,trainable=True,name='input_emb')
-        # shape is batch x timestep x H x W
-        self.timesteps = input_shape[-3]
+        # shape is batch x timestep x (features)
+        self.timesteps = input_shape[-2]
 
     def call(self,inputs):
         # need to compute memories for each timestep
