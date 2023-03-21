@@ -11,13 +11,14 @@ from tensorflow.python.keras import backend as K
 
 # LMU module definition in the Keras API
 class KerasLMU(tf.keras.layers.Layer):
-    def __init__(self,order,theta,hidden_dim,trainable_A=False,trainable_B=False,use_em=False,use_eh=False):
+    def __init__(self,order,theta,hidden_dim,trainable_A=False,trainable_B=False,use_em=False,use_eh=False,timesteps=23):
         super().__init__()
         self.order = order
         self.theta =theta
         self.hidden_dim = hidden_dim
         self.trainable_A = trainable_A
         self.trainable_B = trainable_B
+        self.timesteps=23
         # LMU's have a state (using previous memory and hidden state)
         #self.memory = tf.Variable(initial_value=tf.zeros((order,1)))
         #self.hidden_state = tf.Variable(initial_value=tf.zeros((hidden_dim,1)))
@@ -50,20 +51,16 @@ class KerasLMU(tf.keras.layers.Layer):
         self.e_x = self.add_weight(shape=(input_shape[-1],1),initializer='glorot_uniform'
                                    ,trainable=True,name='input_emb')
         # shape is batch x timestep x (features)
-        print(input_shape)
-        self.timesteps = input_shape[-2]
 
     def call(self,inputs):
         # need to compute memories for each timestep
         shape = tf.shape(inputs)
         batch = shape[0]
-        timestep = shape[1]
         memory = tf.zeros((batch,self.order,1),dtype=tf.float32)
         # writing dummy timestep for t=-1
         hiddens =tf.TensorArray(dtype=tf.float32,size=0,dynamic_size=True,clear_after_read=False)
         hiddens = hiddens.write(0,tf.zeros((1,batch,self.hidden_dim),dtype=tf.float32))
         # iterating over the time dimension
-        print('timesteps:' + str(self.timesteps))
         for i in range(1,self.timesteps+1):
             # transpose to get (batch,hidden_dim,1)
             last_hidden = tf.transpose(hiddens.read(i-1),perm=[1,2,0])
