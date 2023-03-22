@@ -109,6 +109,7 @@ def process_leave_out_one_data(window_size=1,size_threshold=None):
                 # empty array (window size is larger than the segment)
                 continue
             train, val = np.split(windows, [int(len(windows) * 0.75)])
+            train_save_count += 1
             # we save this ictal segment
             np.save(os.path.join('.', 'Processed_Data', patient_id,
                                      str(window_size) + '-' + str(train_save_count) + '-ictal_train.npy'),
@@ -116,7 +117,6 @@ def process_leave_out_one_data(window_size=1,size_threshold=None):
             np.save(os.path.join('.', 'Processed_Data', patient_id,
                                  str(window_size) + '-' + str(train_save_count) + '-ictal_val.npy'),
                     train)
-            train_save_count += 1
 
 
 
