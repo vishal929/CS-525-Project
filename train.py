@@ -79,14 +79,14 @@ if specific_patient:
                                                                            patient=leave_out)
 
         if window_size == 1:
-            model = model.buildModel()
+            model_to_train = model.buildModel()
         else:
-            model = recurrent_model.build_lmu(256, 784, 256, num_lmus=2)
-        trained_model_results = train(model, tf_dataset, val_set, model_specific_name, batch_size=batch_size)
+            model_to_train = recurrent_model.build_lmu(256, 784, 256, num_lmus=2)
+        trained_model_results = train(model_to_train, tf_dataset, val_set, model_specific_name, batch_size=batch_size)
         # evaluate on the leave out seizure
         test_set = test_set.batch(batch_size=batch_size,num_parallel_calls=4)
-        results = model.evaluate(test_set)
-        readable = dict(zip(model.metrics_names,results))
+        results = model_to_train.evaluate(test_set)
+        readable = dict(zip(model_to_train.metrics_names,results))
         print('patient: ' + str(leave_out) + ' leave_out seizure: ' + str(seizure_index) +
              ' window_size: ' +str(window_size) + ' results: ' + str(readable))
 else:
@@ -97,17 +97,17 @@ else:
     # if we are continuing, load the model, otherwise create a new one
     possible_checkpoint =os.path.join(ROOT_DIR, 'Trained Models', model_saved_name)
     if os.path.exists(possible_checkpoint):
-        model = tf.keras.models.load_model(possible_checkpoint)
+        model_to_train = tf.keras.models.load_model(possible_checkpoint)
     else:
         if window_size==1:
-            model = model.buildModel()
+            model_to_train = model.buildModel()
         else:
-            model = recurrent_model.build_lmu(256,784,256,num_lmus=2)
+            model_to_train = recurrent_model.build_lmu(256,784,256,num_lmus=2)
 
-    trained_model_hist = train(model, tf_dataset, val_set, model_saved_name, batch_size=batch_size)
+    trained_model_hist = train(model_to_train, tf_dataset, val_set, model_saved_name, batch_size=batch_size)
 
     # obtaining test results by predicting on the test set
     test_set = data_util.tf_dataset('test',window_size=window_size,leave_out=leave_out)
-    results = model.evaluate(test_set)
-    readable = dict(zip(model.metrics_names,results))
+    results = model_to_train.evaluate(test_set)
+    readable = dict(zip(model_to_train.metrics_names,results))
     print('leave_out: ' + str(leave_out) + ' window_size: ' + str(window_size) + ' results: ' + str(readable))
