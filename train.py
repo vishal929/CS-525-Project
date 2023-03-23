@@ -82,7 +82,7 @@ if specific_patient:
             model = model.buildModel()
         else:
             model = recurrent_model.build_lmu(256, 784, 256, num_lmus=2)
-        trained_model_results = train(model, tf_dataset, val_set, model_saved_name, batch_size=batch_size)
+        trained_model_results = train(model, tf_dataset, val_set, model_specific_name, batch_size=batch_size)
         # evaluate on the leave out seizure
         test_set = test_set.batch(batch_size=batch_size,num_parallel_calls=4)
         results = model.evaluate(test_set)
