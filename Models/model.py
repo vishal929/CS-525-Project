@@ -50,7 +50,7 @@ def buildModel():
     # the class imbalance between seizure and non-seizure depicting data
     #loss_func = keras.losses.categorical_crossentropy
     loss_func = keras.losses.BinaryCrossentropy()
-    optim = keras.optimizers.RMSprop(learning_rate=0.0005)
+    optim = keras.optimizers.RMSprop(learning_rate=0.001)
     metrics = [
         keras.metrics.TruePositives(name='tp'),
         keras.metrics.FalsePositives(name='fp'),
