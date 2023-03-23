@@ -9,4 +9,4 @@ class CombineTrainValAUC(keras.callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         # creating our custom monitor which is the average of train and val AUC
-        logs['train_val_auc'] = 0.5*logs['train_auc'] + 0.5*logs['val_auc']
+        logs['train_val_auc'] = 0.5*logs['auc'] + 0.5*logs['val_auc']
