@@ -228,7 +228,23 @@ def get_patient_level_data(window_size=1,patient='chb01'):
     train = ictals.concatenate(interictals)
     return train,val,test
 
-#train,val,test = get_patient_level_data()
-#print(len(list(iter(val.filter(lambda example,label:label==1)))))
-#print(len(list(iter(train.filter(lambda example,label,weight:label==1)))))
-#print(len(list(iter(test.filter(lambda example,label:label==1)))))
+# getting the number of seizures for a specific patient
+# this is a helper method to picking seizures to use for one-leave-out-validation
+def get_num_seizures(patient='chb01'):
+    glob_res = Path.glob(Path(ROOT_DIR,'Data_Preparation','Processed_Data',patient),'1-*-ictal_train.npy')
+    return len(list(glob_res))
+
+# for each patient, we take val and train and leave out 1 seizure
+# we repeat this 5 times and then average for a score
+def get_seizure_leave_out_data(window_size=1,patient='chb01'):
+    # grabbing seizure and non-seizure files for the patient
+    # grabbing files related to this patient
+    interictal_train_glob_path = os.path.join(ROOT_DIR, 'Data_Preparation', 'Processed_Data', patient
+                                            , str(window_size) + '-*interictal_train.npy')
+    interictal_val_glob_path = os.path.join(ROOT_DIR, 'Data_Preparation', 'Processed_Data', patient
+                                   , str(window_size) + '-*interictal_val.npy')
+    ictal_train_glob_path = os.path.join(ROOT_DIR, 'Data_Preparation', 'Processed_Data', patient
+                                 , str(window_size) + '-*val.npy')
+    ictal_val_glob_path = os.path.join(ROOT_DIR, 'Data_Preparation', 'Processed_Data', patient
+                                         , str(window_size) + '-*val.npy')
+    pass

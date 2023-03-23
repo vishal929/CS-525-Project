@@ -116,7 +116,7 @@ def process_leave_out_one_data(window_size=1,size_threshold=None):
                         train)
             np.save(os.path.join('.', 'Processed_Data', patient_id,
                                  str(window_size) + '-' + str(train_save_count) + '-ictal_val.npy'),
-                    train)
+                    val)
 
 
 
