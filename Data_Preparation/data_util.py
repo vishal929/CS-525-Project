@@ -174,7 +174,21 @@ def get_seizure_leave_out_data(seizure_number,window_size=1,patient='chb01'):
     val = tf.data.Dataset.list_files(val_glob_path)
 
     # removing any files that are in train or val that are also in test_seizure (for leave out)
-    ## WRITE THIS FILTER
+    test_set = set(iter(test))
+    train_list = list(iter(train))
+    val_list = list(iter(val))
+    filtered_train_list = []
+    filtered_val_list = []
+    for file in train_list:
+        if file not in test_set:
+            filtered_train_list.append(file)
+    for file in val_list:
+        if file not in test_set:
+            filtered_train_list.append(file)
+    train_list = filtered_train_list
+    val_list = filtered_val_list
+    train = tf.data.Dataset.from_tensor_slices(train_list)
+    val = tf.data.Dataset.from_tensor_slices(val_list)
 
     # converting filename to batched numpy array and batched label tensors
     train = train.map(lambda x: tf.py_function(npy_to_tf, inp=[x], Tout=[tf.float32, tf.uint8]),
