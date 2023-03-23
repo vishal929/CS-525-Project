@@ -71,6 +71,7 @@ if specific_patient:
     # getting the seizure indices for this patient
     seizure_indices = np.arange(1,data_util.get_num_seizures(leave_out)+1)
     # doing one-leave-out cross validation loop
+    accuracies = []
     for seizure_index in seizure_indices:
         print('training for patient: ' + str(leave_out) + ' one seizure leave out: ' + str(seizure_index))
         model_specific_name = model_saved_name + '----seizure_number:' + str(seizure_index)
@@ -87,8 +88,10 @@ if specific_patient:
         test_set = test_set.batch(batch_size=batch_size,num_parallel_calls=4)
         results = model_to_train.evaluate(test_set)
         readable = dict(zip(model_to_train.metrics_names,results))
+        accuracies.append(readable['accuracy'])
         print('patient: ' + str(leave_out) + ' leave_out seizure: ' + str(seizure_index) +
              ' window_size: ' +str(window_size) + ' results: ' + str(readable))
+    print('average accuracy for this experiment: ' + str(np.mean(np.array(accuracies))))
 else:
     tf_dataset = data_util.tf_dataset('train', window_size=window_size, leave_out=leave_out)
     val_set = data_util.tf_dataset('val',window_size=window_size,leave_out=leave_out)
