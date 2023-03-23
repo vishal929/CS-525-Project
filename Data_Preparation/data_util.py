@@ -174,9 +174,9 @@ def get_seizure_leave_out_data(seizure_number,window_size=1,patient='chb01'):
     val = tf.data.Dataset.list_files(val_glob_path)
 
     # removing any files that are in train or val that are also in test_seizure (for leave out)
-    test_set = set(iter(test))
-    train_list = list(iter(train))
-    val_list = list(iter(val))
+    test_set = set(iter(test.as_numpy_iterator()))
+    train_list = list(iter(train.as_numpy_iterator()))
+    val_list = list(iter(val.as_numpy_iterator()))
     filtered_train_list = []
     filtered_val_list = []
     for file in train_list:
@@ -184,7 +184,7 @@ def get_seizure_leave_out_data(seizure_number,window_size=1,patient='chb01'):
             filtered_train_list.append(file)
     for file in val_list:
         if file not in test_set:
-            filtered_train_list.append(file)
+            filtered_val_list.append(file)
     train_list = filtered_train_list
     val_list = filtered_val_list
     train = tf.data.Dataset.from_tensor_slices(train_list)
@@ -235,3 +235,14 @@ def get_seizure_leave_out_data(seizure_number,window_size=1,patient='chb01'):
     train = ictals.concatenate(interictals)
 
     return train,val,test
+
+'''
+train,val,test = get_seizure_leave_out_data(1)
+print(train.reduce(0,lambda y,_: y+1))
+print(val.reduce(0,lambda y,_: y+1))
+print(test.reduce(0,lambda y,_: y+1))
+
+print(train.filter(lambda example,label,weight: label==1).reduce(0,lambda y,_:y+1))
+print(val.filter(lambda example,label: label==1).reduce(0,lambda y,_:y+1))
+print(test.filter(lambda example,label: label==1).reduce(0,lambda y,_:y+1))
+'''
