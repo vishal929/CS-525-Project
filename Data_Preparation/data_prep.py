@@ -68,6 +68,119 @@ def dir_over_limit(folder_path,threshold=None,window_size=12):
         else:
             return False
 
+# we process leave out_one_data here
+# basically, for each patient, we save all interictal and ictal samples
+# however, for ictal samples, we separate files based on seizure instance
+# i.e one seizure will be in a single file, one seizure in another and so on
+def process_leave_out_one_data(window_size=1,size_threshold=None):
+    metadata = preprocess_metadata()
+    for patient in metadata:
+        # patient 12 and 24 should be omitted due to no valid interictal data
+        if 'chb12' in patient or 'chb24' in patient:
+            continue
+        # window size 12 comparisons exclude patient 16
+        if window_size == 12 and 'chb16' in patient:
+            continue
+        # getting patient id, like 'chb01' or 'chb02'
+        patient_id = os.path.basename(patient)
+        patient_files = metadata[patient]
+        ictal, interictal = split_eeg_into_classes(patient_files, patient)
+        ictal_train, ictal_val = [], []
+        interictal_train, interictal_val = [], []
+
+        # need to create directory if it doesnt already exist
+        if not os.path.isdir(os.path.join('.', 'Processed_Data', patient_id)):
+            os.mkdir(os.path.join('.', 'Processed_Data', patient_id))
+
+        # after 1000 examples, we want to create a separate batched file (only applicable for interictal)
+        if window_size == 1:
+            save_threshold = 12000
+        else:
+            save_threshold = 1000
+
+        train_save_count = 0
+        while len(ictal) > 0:
+            segment = ictal.pop()
+            # we want to window this segment, run short fourier transform and send to train/val
+            # the latter 25% are sent to validation
+            # WHAT IS IMPORTANT HERE IS THAT SEIZURE DATA IS INDEXED! SO WE CAN DO CROSS VALIDATION ON SEIZURE LEVEL FOR EACH PATIENT
+            windows = window_recordings(segment, window_size=window_size)
+            if windows.shape[0] == 0:
+                # empty array (window size is larger than the segment)
+                continue
+            train, val = np.split(windows, [int(len(windows) * 0.75)])
+            train_save_count += 1
+            # we save this ictal segment
+            np.save(os.path.join('.', 'Processed_Data', patient_id,
+                                     str(window_size) + '-' + str(train_save_count) + '-ictal_train.npy'),
+                        train)
+            np.save(os.path.join('.', 'Processed_Data', patient_id,
+                                 str(window_size) + '-' + str(train_save_count) + '-ictal_val.npy'),
+                    val)
+
+
+
+        # most of our values have around 9 digits of precision and exponent around -05 to -08, so float32 is all we need
+        # saving ictal data to disk (we are saving as float32, float64 is going to be worse in our case
+
+        num_train_processed = 0
+        num_val_processed = 0
+        train_save_count = 0
+        val_save_count = 0
+        while len(interictal) > 0:
+            segment = interictal.pop()
+            # the latter 25% are sent to validation
+            # we want to window this segment, run short fourier transform and send to train/val
+            windows = window_recordings(segment, window_size=window_size)
+            if windows.shape[0] == 0:
+                # empty array (window size is larger than the segment)
+                continue
+            train, val = np.split(windows, [int(len(windows) * 0.75)])
+
+            # adding to data pool
+            interictal_train.append(train)
+            interictal_val.append(val)
+
+            num_train_processed += train.shape[0]
+            num_val_processed += val.shape[0]
+
+            if num_train_processed > save_threshold or len(interictal) == 0:
+                # we should save this array
+                interictal_train = np.concatenate(interictal_train, axis=0, dtype=np.float32)
+                # 22 channels
+                # assert interictal_train.shape[1] == 22
+                # 114 frequencies in frequency domain
+                # assert interictal_train.shape[2] == 114
+                train_save_count += 1
+                np.save(os.path.join('.', 'Processed_Data', patient_id,
+                                     str(window_size) + '-' + str(train_save_count) + '-interictal_train.npy'),
+                        interictal_train)
+                # checking if we are over the limit
+                if dir_over_limit(os.path.join('.', 'Processed_Data', patient_id), threshold=size_threshold,
+                                  window_size=window_size):
+                    break
+                # resetting
+                interictal_train = []
+                num_train_processed = 0
+
+            if num_val_processed > save_threshold or len(interictal) == 0:
+                # we should save this array
+                interictal_val = np.concatenate(interictal_val, axis=0, dtype=np.float32)
+                # 22 channels
+                # assert interictal_val.shape[1] == 22
+                # 114 frequencies in frequency domain
+                # assert interictal_val.shape[2] == 114
+                val_save_count += 1
+                np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-' + str(val_save_count) \
+                                     + '-interictal_val.npy'),
+                        interictal_val)
+                # checking if we are over the limit
+                if dir_over_limit(os.path.join('.', 'Processed_Data', patient_id), threshold=size_threshold,
+                                  window_size=window_size):
+                    break
+                # resetting
+                interictal_val = []
+                num_val_processed = 0
 
 
 # function that processes,tags, and splits data eeg data for seizure classification based on processed metadata
@@ -565,4 +678,4 @@ def grab_missing_records(record_list):
     Below is some basic logic I wrote while testing stuff
 '''
 
-process_data(window_size=1,size_threshold=None)
+process_leave_out_one_data(window_size=1,size_threshold=None)
