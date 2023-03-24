@@ -130,7 +130,7 @@ def build_lmu(order,theta,hidden_dim,num_lmus=1):
     # the class imbalance between seizure and non-seizure depicting data
     # loss_func = keras.losses.categorical_crossentropy
     loss_func = tf.keras.losses.BinaryCrossentropy()
-    optim = tf.keras.optimizers.RMSprop(learning_rate=0.001)
+    optim = tf.keras.optimizers.RMSprop(learning_rate=0.00001)
     metrics = [
         tf.keras.metrics.TruePositives(name='tp'),
         tf.keras.metrics.FalsePositives(name='fp'),
