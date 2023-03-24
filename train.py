@@ -19,6 +19,7 @@ def train(model, tf_dataset, val_set, model_save_name, batch_size=32):
     # want to early stop if the combined train and val AUC average does not improve for 15 consecutive epochs
     early_stop = tf.keras.callbacks.EarlyStopping(
         monitor='train_val_auc',
+        mode='max',
         patience=15
     )
     # we want to save the state of the model while training (we save the entire model to allow for continuing training)
@@ -53,6 +54,9 @@ if window_size==1:
     batch_size = 32768
 else:
     batch_size = 8192
+
+if specific_patient:
+    batch_size=32
 
 # leave_out/specific patient
 # (if specific patient flag is set, we will train,val,test for this patient)
