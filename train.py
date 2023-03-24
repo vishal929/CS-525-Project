@@ -19,9 +19,11 @@ def train(model, tf_dataset, val_set, model_save_name, batch_size=32):
     # want to early stop if the combined train and val AUC average does not improve for 15 consecutive epochs
     early_stop = tf.keras.callbacks.EarlyStopping(
         monitor='train_val_auc',
-        mode='max',
-        patience=15
+        verbose=1,
+        patience=15,
+        mode='max'
     )
+
     # we want to save the state of the model while training (we save the entire model to allow for continuing training)
     checkpoint_path = os.path.join(ROOT_DIR, 'Trained Models', model_save_name)
 
@@ -29,7 +31,8 @@ def train(model, tf_dataset, val_set, model_save_name, batch_size=32):
     save_weights = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
                                                       verbose=1,
                                                       save_best_only=True,
-                                                      monitor='train_val_auc')
+                                                      monitor='train_val_auc',
+                                                      mode='max')
     # batching and shuffling
     tf_dataset = tf_dataset.shuffle(buffer_size=100000).batch(batch_size, num_parallel_calls=4)
     val_set = val_set.batch(batch_size, num_parallel_calls=4)
