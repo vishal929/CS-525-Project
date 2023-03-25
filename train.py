@@ -76,7 +76,7 @@ model_saved_name = str(leave_out) + '----' + str(window_size)
 
 if specific_patient:
     # getting the seizure indices for this patient
-    seizure_indices = np.arange(1,data_util.get_num_seizures(leave_out)+1)
+    seizure_indices = np.arange(1,data_util.get_num_seizures(window_size,leave_out)+1)
     # doing one-leave-out cross validation loop
     accuracies = []
     for seizure_index in seizure_indices:

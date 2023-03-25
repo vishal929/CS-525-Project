@@ -111,8 +111,8 @@ def get_class_counts(tf_dataset):
 
 # getting the number of seizures for a specific patient
 # this is a helper method to picking seizures to use for one-leave-out-validation
-def get_num_seizures(patient='chb01'):
-    glob_res = Path.glob(Path(ROOT_DIR,'Data_Preparation','Processed_Data',patient),'1-*-ictal_train.npy')
+def get_num_seizures(window_size=1,patient='chb01'):
+    glob_res = Path.glob(Path(ROOT_DIR,'Data_Preparation','Processed_Data',patient),str(window_size)+'-*-ictal_train.npy')
     return len(list(glob_res))
 
 # for each patient, we take val and train and leave out 1 seizure
