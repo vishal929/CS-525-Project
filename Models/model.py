@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow import keras
-#import nengo_dl
+import nengo_dl
+import nengo
 
 # around 92k params
 # Building the convolutional neural network:
@@ -65,6 +66,18 @@ def buildModel():
     print('CNN model successfully built')
     return model
 
+# helper function to explicitly strip a model of its dropout layers for nengo conversion
+def remove_dropout_layers(model):
+    layers = model.layers
+    input_layer = layers[0]
+    x = input_layer.output
+    for l in layers[1:]:
+        if not isinstance(l,keras.layers.Dropout):
+            x = l(x)
+    new_model = keras.Model(input_layer.input,x)
+    print(new_model.summary())
+    return new_model
+
 # loading a model from a saved checkpoint
 # model path should be something like '...../Trained Models/chb01-1.ckpt'
 # chb01 is the leave-out and 1 is the window_size
@@ -72,17 +85,21 @@ def load_model(model_path):
     model = buildModel()
     model.load_weights(model_path)
 
-# function that converts this keras model into an snn via nengo_converter
-'''
-def convert_snn():
+# function that converts this keras model into an snn in nengo
+def convert_snn(saved_weights_directory=None):
     model = buildModel()
+    # loading weights if they exist
+    if saved_weights_directory:
+        model.load_weights(saved_weights_directory)
     # need to remove dropout layers because they are not supported in nengo
-    #print(model.summary())
-    converted = nengo_dl.Converter(model,max_to_avg_pool=True,inference_only=True)
+    stripped_model = remove_dropout_layers(model)
+    swap_activations = {tf.nn.leaky_relu:nengo_dl.LeakyReLU()}
+    converted = nengo_dl.Converter(stripped_model,max_to_avg_pool=True,inference_only=True,allow_fallback=False,
+                                   swap_activations=swap_activations)
     print(converted.verify())
     return converted
-'''
-#converted = convert_snn()
+
+converted = convert_snn()
 
 #with nengo_dl.Simulator(converted.net) as sim:
 #    sim.run(3)
