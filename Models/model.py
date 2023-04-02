@@ -93,7 +93,7 @@ def convert_snn(saved_weights_directory=None):
         model.load_weights(saved_weights_directory)
     # need to remove dropout layers because they are not supported in nengo
     stripped_model = remove_dropout_layers(model)
-    swap_activations = {tf.nn.leaky_relu:nengo_dl.LeakyReLU()}
+    swap_activations = {tf.nn.leaky_relu:nengo_dl.SpikingLeakyReLU()}
     converted = nengo_dl.Converter(stripped_model,max_to_avg_pool=True,inference_only=True,allow_fallback=False,
                                    swap_activations=swap_activations)
     print(converted.verify())
