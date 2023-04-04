@@ -1,8 +1,8 @@
 # this model is a recurrent model based on LMUs for processing 12s window segments for binary classification
 # since we do not require intermediate outputs, we can parallelize the lmu!
 
-#import nengo
-#import nengo_dl
+import nengo
+import nengo_dl
 #from nengo.utils.filter_design import cont2discrete
 from scipy.signal import cont2discrete
 import numpy as np
@@ -97,7 +97,7 @@ class KerasLMU(tf.keras.layers.Layer):
         return hiddens
 
 
-
+# the below function is taken from the nengo state space matrices for LMU example documentation
 def get_state_space_matrices(order,theta):
     Q = np.arange(order, dtype=np.float64)
     R = (2 * Q + 1)[:, None] / theta
@@ -145,7 +145,96 @@ def build_lmu(order,theta,hidden_dim,num_lmus=1):
     print('LMU model successfully built')
     return model
 
+@nengo_dl.Converter.register(KerasLMU)
+class ConvertKerasLMU(nengo_dl.converter.LayerConverter):
+    def convert(self, node_id):
+        A,B,W_h,W_m,W_x,e_x = tf.keras.backend.batch_get_value([self.layer.A,self.layer.B,self.layer.W_h,
+                                                                self.layer.W_m,self.layer.W_x,self.layer.e_x])
+        x = nengo.Node(size_in=W_x.shape[-2])
+        memory = nengo.Node(size_in=self.layer.order)
+        hidden = nengo.Node(size_in=self.layer.hidden_dim)
+        u = nengo.Node(size_in=1)
 
+        # create a Nengo object representing the output of this layer node
+        output = self.add_nengo_obj(node_id=node_id, activation=tf.nn.leaky_relu)
+
+        # connect up the input of the layer node to the input in the lmu
+        self.add_connection(node_id, x)
+
+        # computing input scaling
+        u_x = nengo.Connection(x,u,transform=e_x.reshape(1,np.prod(e_x.shape)),synapse=None)
+        if self.layer.use_em:
+            e_m = tf.keras.backend.get_value(self.layer.e_m)
+            # synapse=0 to get the previous value of memory
+            u_m = nengo.Connection(memory,u,transform=e_m.reshape(1,np.prod(e_m.shape)),synapse=0)
+        if self.layer.use_eh:
+            e_h = tf.keras.backend.get_value(self.layer.e_h)
+            # synapse=0 to get previous value of hidden state
+            u_h = nengo.Connection(hidden,u,transform=e_h.reshape(1,np.prod(e_h.shape)),synapse=0)
+
+        # compute memory ops
+        # synapse=0 to get previous value of memory
+        m_A = nengo.Connection(memory,memory,transform=A,synapse=0)
+        m_B = nengo.Connection(u,memory,transform=B,synapse=None)
+
+        # computing hidden state
+        h_x = nengo.Connection(x,hidden,transform=np.transpose(W_x),synapse=None)
+        # synapse=0 to get previous hidden state
+        h_h = nengo.Connection(hidden,hidden,transform=W_h,synapse=0)
+        h_m = nengo.Connection(memory,hidden,transform=W_m,synapse=None)
+
+        # connect up hidden state to output
+        conn = nengo.Connection(hidden, output, transform=None, synapse=None)
+
+        self.set_trainable(conn, False)
+
+        return output
+
+@nengo_dl.Converter.register(tf.keras.layers.Lambda)
+class ConvertLambda(nengo_dl.converter.LayerConverter):
+    def convert(self, node_id):
+        # do nothing
+        output = self.add_nengo_obj(node_id=node_id)
+        # connect input to hidden node
+        self.add_connection(node_id, output)
+        return output
+
+def remove_lambda_layer(model):
+    layers = model.layers
+    input_layer = layers[0]
+    x = input_layer.output
+    for l in layers[1:]:
+        if not isinstance(l, tf.keras.layers.Lambda):
+            x = l(x)
+    new_model = tf.keras.Model(input_layer.input, x)
+    print(new_model.summary())
+    return new_model
+
+# function that converts our non-spiking LMU to a spiking one in Nengo
+def convert_recurrent_snn(order=256,theta=784,hidden_dim=256,num_lmus=2,saved_weights_directory=None):
+    model = build_lmu(order,theta,hidden_dim,num_lmus)
+    # loading weights if they exist
+    if saved_weights_directory:
+        model.load_weights(saved_weights_directory)
+    # need to remove dropout layers because they are not supported in nengo
+    #stripped_model = remove_dropout_layers(model)
+    stripped_model = remove_lambda_layer(model)
+    swap_activations = {tf.nn.leaky_relu: nengo_dl.SpikingLeakyReLU()}
+    converted = nengo_dl.Converter(stripped_model, inference_only=True, allow_fallback=False,
+                                   swap_activations=swap_activations,temporal_model=True)
+    return converted
+
+converter = convert_recurrent_snn()
+with nengo.Network() as net:
+    # no need for any training
+    nengo_dl.configure_settings(
+        trainable=None,
+        stateful=True,
+        keep_history=True,
+    )
+    with nengo_dl.Simulator(converter.net) as sim:
+
+        print(sim.predict(x=np.ones(shape=(2,23,2508))))
 
 '''
 model = build_lmu(256,784,256,num_lmus=2)
