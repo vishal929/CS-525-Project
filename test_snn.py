@@ -7,6 +7,8 @@ from Data_Preparation import data_util
 from Models import model
 from constants import ROOT_DIR
 import os
+from pathlib import Path
+import re
 #from keras_data_format_converter import convert_channels_first_to_last
 
 #modified buildModel for channel last
@@ -88,77 +90,133 @@ def buildModel():
 #     layer.set_weights(weight)
 # print(new_model.summary())
 
-
-seizure_number=1
+# globbing for saved model paths of this specific window_size
 window_size=1
-leave_out = 'chb01'
-timesteps = 20
 
-converted = model.convert_snn(os.path.join(ROOT_DIR,'Trained Models','chb01----1----seizure_number_1'))
+model_paths = Path.glob(Path(ROOT_DIR,'Trained Models'),'chb*----'+str(window_size)+'----seizure_number_*')
+model_paths = list(model_paths)
 
-# we can throw out train and val, no need for that in evaluation
-_,_,test_set = data_util.get_seizure_leave_out_data(seizure_number=1,window_size=window_size,patient=leave_out)
+# this dictionary holds mappings for each experiment i.e {patient_id:[exp_1 accuracy, exp2,accuracy]...}
+patient_accs = {}
 
-# split into examples and labels
-examples = test_set.map(lambda example,label: example)
-labels = test_set.map(lambda example,label: label)
+for model_path in model_paths:
+    model_path = str(model_path)
+    basename = os.path.basename(model_path)
+    # lets get the patient id
+    patient = basename[:5]
+    # lets get the specific seizure to test on
+    seizure_number = int(re.sub("[^0-9]","",basename[-2:]))
+    # specify timesteps to repeat input for snn
+    timesteps = 40
+
+    print('testing snn for patient: ' + str(patient) + ' on seizure number: ' + str(seizure_number))
+
+    converted = model.convert_snn(model_path)
+
+    # we can throw out train and val, no need for that in evaluation
+    _,_,test_set = data_util.get_seizure_leave_out_data(seizure_number=seizure_number,
+                                                        window_size=window_size,
+                                                        patient=patient)
+
+    # split into examples and labels
+    examples = test_set.map(lambda example,label: example)
+    labels = test_set.map(lambda example,label: label)
 
 
-# convert dataset to numpy lists (no problem for evaluation)
-examples = list(examples.as_numpy_iterator())
-labels = list(labels.as_numpy_iterator())
+    # convert dataset to numpy lists (no problem for evaluation)
+    examples = list(examples.as_numpy_iterator())
+    labels = list(labels.as_numpy_iterator())
 
-# need to repeat inputs for some timesteps for snn
-num_examples = len(examples)
-num_features = 22*114
+    # need to repeat inputs for some timesteps for snn
+    num_examples = len(examples)
+    num_features = 22*114
 
-examples = np.stack(examples,axis=0)
-labels = np.stack(labels)
+    examples = np.stack(examples,axis=0)
+    labels = np.stack(labels)
 
 
-# repeating examples and labels for a certain number of timesteps
-examples = np.expand_dims(examples,axis=1).repeat(timesteps,axis=1).reshape((num_examples,timesteps,2508))
-#labels = np.expand_dims(labels,axis=-1).repeat(2508,axis=-1)
-labels = np.expand_dims(labels,axis=1).repeat(timesteps,axis=1)
-labels = np.expand_dims(labels,axis=-1)
+    # repeating examples and labels for a certain number of timesteps
+    examples = examples.reshape(num_examples,1,-1)
+    examples = np.tile(examples, (1,timesteps,1))
+    labels = np.expand_dims(labels,axis=-1).repeat(num_features,axis=-1)
+    labels = np.expand_dims(labels,axis=1).repeat(timesteps,axis=1)
 
-# examples should be (num_examples,timesteps,22x114=2508)
-print(examples.shape)
-print(labels.shape)
+    # examples should be (num_examples,timesteps,22x114=2508)
+    #print(examples.shape)
+    #print(labels.shape)
 
-#print(converted.verify(inputs=np.ones((1,1,22,114))))
+    #print(converted.verify(inputs=np.ones((1,1,22,114))))
 
-with converted.net:
-    print(converted.net)
-    print(converted.net.inputs)
-    print(converted.net.outputs)
-    # no need for any training
-    nengo_dl.configure_settings(
-        trainable=None,
-        stateful=False,
-        keep_history=False,
-    )
-    with nengo_dl.Simulator(converted.net,progress_bar=True) as sim:
-        #print(converted.net.probeable)
-        sim.compile(loss=keras.losses.BinaryCrossentropy(),
-                    metrics=[
-            keras.metrics.TruePositives(name='tp'),
-            keras.metrics.FalsePositives(name='fp'),
-            keras.metrics.TrueNegatives(name='tn'),
-            keras.metrics.FalseNegatives(name='fn'),
-            keras.metrics.BinaryAccuracy(name='accuracy'),
-            keras.metrics.Precision(name='precision'),
-            keras.metrics.Recall(name='recall'),
-            keras.metrics.AUC(name='auc'),
-        ])
-        pred = sim.predict(examples)
-        #print(sim.predict(x=np.expand_dims(examples[0,:,:],axis=0)))
-        #print(sim.evaluate(x=examples,y=labels))
-pred = list(pred.values())[0]
-print(pred.shape)
-pred = np.squeeze(pred)
-labels = np.squeeze(labels[:,0,:])
-print('pred shape: ' + str(pred.shape))
-print('labels shape: ' + str(labels.shape))
-print((np.equal(np.round(pred),labels)).astype(np.int32).sum())
-#print(list(pred.values())[0].shape)
+    with converted.net:
+        # no need for any training
+        nengo_dl.configure_settings(
+            trainable=None,
+            stateful=True,
+            keep_history=True,
+        )
+        with nengo_dl.Simulator(converted.net,progress_bar=True) as sim:
+            #print(converted.net.probeable)
+            sim.compile(loss={converted.outputs[converted.model.output]:keras.losses.BinaryCrossentropy(from_logits=True)},
+                        metrics={
+                            converted.outputs[converted.model.output]:keras.metrics.TruePositives(name='tp'),
+                            converted.outputs[converted.model.output]:keras.metrics.FalsePositives(name='fp'),
+                            converted.outputs[converted.model.output]:keras.metrics.TrueNegatives(name='tn'),
+                            converted.outputs[converted.model.output]:keras.metrics.FalseNegatives(name='fn'),
+                            converted.outputs[converted.model.output]:keras.metrics.BinaryAccuracy(name='accuracy'),
+                            converted.outputs[converted.model.output]:keras.metrics.Precision(name='precision'),
+                            converted.outputs[converted.model.output]:keras.metrics.Recall(name='recall'),
+                            converted.outputs[converted.model.output]:keras.metrics.AUC(name='auc'),
+                        })
+            pred = sim.predict(x=examples,n_steps=timesteps)
+            #print(sim.predict(x=np.expand_dims(examples[0,:,:],axis=0)))
+            #sim.evaluate(x=examples,y=labels)
+
+    pred = list(pred.values())[0]
+
+    pred = np.squeeze(pred)
+    # decoding by taking the mean activation
+    pred = np.mean(pred,axis=-1)
+
+    # if decoded value < 0 , then we give 0, if decoded value > 0, we give 1
+    pred = np.greater_equal(pred,0).astype(np.int32)
+
+    #print(pred.shape)
+    #print(pred)
+    labels = np.squeeze(labels[:,0,0])
+    #print('pred shape: ' + str(pred.shape))
+    #print('labels shape: ' + str(labels.shape))
+    #print('accuracy: ' + str((np.equal(np.round(pred),labels)).astype(np.int32).mean()))
+
+    # getting false positives,false negatives, true negatives, and true positives
+    fp = np.logical_and(np.equal(pred,1),np.equal(labels,0)).astype(np.int32).sum()
+    tp = np.logical_and(np.equal(pred,1),np.equal(labels,1)).astype(np.int32).sum()
+    fn = np.logical_and(np.equal(pred,0),np.equal(labels,1)).astype(np.int32).sum()
+    tn = np.logical_and(np.equal(pred,0),np.equal(labels,0)).astype(np.int32).sum()
+    print('false positive: ' + str(fp))
+    print('true positive: ' + str(tp))
+    print('false negative: ' + str(fn))
+    print('true negative: ' + str(tn))
+
+    # computing accuracy
+    accuracy = np.equal(pred,labels).astype(np.int32).mean()
+    print('accuracy: ' + str(accuracy))
+
+    # computing precision
+    precision = tp/(fp+tp)
+    print('precision: ' + str(precision))
+
+    # computing recall
+    recall = tp/(tp+fn)
+    print('recall: ' + str(recall))
+
+    # storing detection accuracy in dictionary so we can compute mean at the end
+    if patient in patient_accs:
+        (patient_accs[patient]).append(accuracy)
+    else:
+        patient_accs[patient] = [accuracy]
+
+# computing patient accuracies for each experiment
+for patient in patient_accs:
+    total_acc = np.array(patient_accs[patient]).mean()
+    print('accuracy on all experiments for patient: ' + str(patient) + ' acc: ' + str(total_acc))
+
