@@ -80,7 +80,7 @@ def remove_dropout_layers(model):
         if not isinstance(l,keras.layers.Dropout):
             x = l(x)
     new_model = keras.Model(input_layer.input,x)
-    print(new_model.summary())
+    #print(new_model.summary())
     return new_model
 
 # loading a model from a saved checkpoint
@@ -96,8 +96,9 @@ def convert_snn(saved_weights_directory=None):
     #model = keras.models.load_model('../Trained Models/chb01----1----seizure_number:1')
     # model = convert_channels_first_to_last(model)
     # # loading weights if they exist
+    print(saved_weights_directory)
     if saved_weights_directory is not None:
-         model = keras.models.load_model(os.path.join(ROOT_DIR,saved_weights_directory))
+         model = keras.models.load_model(saved_weights_directory)
     else:
          model = buildModel()
     # need to remove dropout layers because they are not supported in nengo
@@ -111,8 +112,11 @@ def convert_snn(saved_weights_directory=None):
     return converted
 
 # check if we are using gpu
+'''
+mod = buildModel()
+print(mod.predict(np.ones((2,1,22,114))))
 print(tf.config.list_physical_devices('GPU'))
-converted = convert_snn(os.path.join('Trained Models','chb01----1----seizure_number_1'))
+converted = convert_snn(os.path.join(ROOT_DIR,'Trained Models','chb01----1----seizure_number_1'))
 
 test_set = data_util.tf_dataset('test',window_size=1,leave_out='chb01')
 
@@ -120,12 +124,13 @@ with nengo.Network() as net:
  # no need for any training
  nengo_dl.configure_settings(
      trainable=None,
-     stateful=True,
-     keep_history=True,
+     stateful=False,
+     keep_history=False,
  )
  with nengo_dl.Simulator(converted.net) as sim:
 
-     print(sim.predict(x=np.ones(shape=(2,23,2508))))
+     print(sim.predict(x=np.ones(shape=(2,10,2508))))
+'''
 # converted = convert_snn('../Trained Models/chb01----1----seizure_number:1/variables/variables')
 # model = keras.models.load_model('../Trained Models/chb01----1----seizure_number:1')
 # print(model.summary())

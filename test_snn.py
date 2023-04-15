@@ -5,7 +5,9 @@ import nengo
 import numpy as np
 from Data_Preparation import data_util
 from Models import model
-from keras_data_format_converter import convert_channels_first_to_last
+from constants import ROOT_DIR
+import os
+#from keras_data_format_converter import convert_channels_first_to_last
 
 #modified buildModel for channel last
 def buildModel():
@@ -69,8 +71,8 @@ def buildModel():
     print('CNN model successfully built')
     return model
 
-new_model = buildModel()
-old_model = keras.models.load_model('Trained Models/chb01----1----seizure_number:1')
+#new_model = buildModel()
+#old_model = keras.models.load_model('Trained Models/chb01----1----seizure_number:1')
 #old_model = convert_channels_first_to_last(old_model)
 # print(old_model.summary())
 # weights = [layer.get_weights() for layer in old_model.layers]
@@ -87,17 +89,76 @@ old_model = keras.models.load_model('Trained Models/chb01----1----seizure_number
 # print(new_model.summary())
 
 
-# converted = model.convert_snn()
+seizure_number=1
+window_size=1
+leave_out = 'chb01'
+timesteps = 20
 
-# test_set = data_util.tf_dataset('test',window_size=1,leave_out='chb01')
+converted = model.convert_snn(os.path.join(ROOT_DIR,'Trained Models','chb01----1----seizure_number_1'))
 
-# with converted.net:
-#     # no need for any training
-#     nengo_dl.configure_settings(
-#         trainable=None,
-#         stateful=True,
-#         keep_history=True,
-#     )
-# with nengo_dl.Simulator(converted.net) as sim:
-#     sim.compile()
-#     print(sim.evaluate(x=test_set))
+# we can throw out train and val, no need for that in evaluation
+_,_,test_set = data_util.get_seizure_leave_out_data(seizure_number=1,window_size=window_size,patient=leave_out)
+
+# split into examples and labels
+examples = test_set.map(lambda example,label: example)
+labels = test_set.map(lambda example,label: label)
+
+
+# convert dataset to numpy lists (no problem for evaluation)
+examples = list(examples.as_numpy_iterator())
+labels = list(labels.as_numpy_iterator())
+
+# need to repeat inputs for some timesteps for snn
+num_examples = len(examples)
+num_features = 22*114
+
+examples = np.stack(examples,axis=0)
+labels = np.stack(labels)
+
+
+# repeating examples and labels for a certain number of timesteps
+examples = np.expand_dims(examples,axis=1).repeat(timesteps,axis=1).reshape((num_examples,timesteps,2508))
+#labels = np.expand_dims(labels,axis=-1).repeat(2508,axis=-1)
+labels = np.expand_dims(labels,axis=1).repeat(timesteps,axis=1)
+labels = np.expand_dims(labels,axis=-1)
+
+# examples should be (num_examples,timesteps,22x114=2508)
+print(examples.shape)
+print(labels.shape)
+
+#print(converted.verify(inputs=np.ones((1,1,22,114))))
+
+with converted.net:
+    print(converted.net)
+    print(converted.net.inputs)
+    print(converted.net.outputs)
+    # no need for any training
+    nengo_dl.configure_settings(
+        trainable=None,
+        stateful=False,
+        keep_history=False,
+    )
+    with nengo_dl.Simulator(converted.net,progress_bar=True) as sim:
+        #print(converted.net.probeable)
+        sim.compile(loss=keras.losses.BinaryCrossentropy(),
+                    metrics=[
+            keras.metrics.TruePositives(name='tp'),
+            keras.metrics.FalsePositives(name='fp'),
+            keras.metrics.TrueNegatives(name='tn'),
+            keras.metrics.FalseNegatives(name='fn'),
+            keras.metrics.BinaryAccuracy(name='accuracy'),
+            keras.metrics.Precision(name='precision'),
+            keras.metrics.Recall(name='recall'),
+            keras.metrics.AUC(name='auc'),
+        ])
+        pred = sim.predict(examples)
+        #print(sim.predict(x=np.expand_dims(examples[0,:,:],axis=0)))
+        #print(sim.evaluate(x=examples,y=labels))
+pred = list(pred.values())[0]
+print(pred.shape)
+pred = np.squeeze(pred)
+labels = np.squeeze(labels[:,0,:])
+print('pred shape: ' + str(pred.shape))
+print('labels shape: ' + str(labels.shape))
+print((np.equal(np.round(pred),labels)).astype(np.int32).sum())
+#print(list(pred.values())[0].shape)
