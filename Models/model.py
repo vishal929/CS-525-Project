@@ -3,7 +3,10 @@ from tensorflow import keras
 import nengo_dl
 import nengo
 import numpy as np
-from keras_data_format_converter import convert_channels_first_to_last
+#from keras_data_format_converter import convert_channels_first_to_last
+from constants import ROOT_DIR
+import os
+from Data_Preparation import data_util
 
 # around 92k params
 # Building the convolutional neural network:
@@ -90,33 +93,39 @@ def load_model(model_path):
 # function that converts this keras model into an snn in nengo
 def convert_snn(saved_weights_directory=None):
     # model = buildModel()
-    model = keras.models.load_model('../Trained Models/chb01----1----seizure_number:1')
+    #model = keras.models.load_model('../Trained Models/chb01----1----seizure_number:1')
     # model = convert_channels_first_to_last(model)
     # # loading weights if they exist
-    # if saved_weights_directory:
-    #     model.load_weights(saved_weights_directory)
+    if saved_weights_directory is not None:
+         model = keras.models.load_model(os.path.join(ROOT_DIR,saved_weights_directory))
+    else:
+         model = buildModel()
     # need to remove dropout layers because they are not supported in nengo
     stripped_model = remove_dropout_layers(model)
     swap_activations = {tf.nn.leaky_relu:nengo_dl.SpikingLeakyReLU()}
     converted = nengo_dl.Converter(stripped_model,max_to_avg_pool=True,inference_only=True,allow_fallback=False,
                                    swap_activations=swap_activations)
-    print(converted.verify())
+    # need to comment out .verify() in order for execution to run
+    # verify will fail for this model since we swap max to avg pool
+    #print(converted.verify())
     return converted
 
-converted = convert_snn()
+# check if we are using gpu
+print(tf.config.list_physical_devices('GPU'))
+converted = convert_snn(os.path.join('Trained Models','chb01----1----seizure_number_1'))
 
-# test_set = data_util.tf_dataset('test',window_size=1,leave_out='chb01')
+test_set = data_util.tf_dataset('test',window_size=1,leave_out='chb01')
 
-# with nengo.Network() as net:
-#     # no need for any training
-#     nengo_dl.configure_settings(
-#         trainable=None,
-#         stateful=True,
-#         keep_history=True,
-#     )
-#     with nengo_dl.Simulator(converted.net) as sim:
+with nengo.Network() as net:
+ # no need for any training
+ nengo_dl.configure_settings(
+     trainable=None,
+     stateful=True,
+     keep_history=True,
+ )
+ with nengo_dl.Simulator(converted.net) as sim:
 
-#         print(sim.predict(x=np.ones(shape=(2,23,2508))))
+     print(sim.predict(x=np.ones(shape=(2,23,2508))))
 # converted = convert_snn('../Trained Models/chb01----1----seizure_number:1/variables/variables')
 # model = keras.models.load_model('../Trained Models/chb01----1----seizure_number:1')
 # print(model.summary())
