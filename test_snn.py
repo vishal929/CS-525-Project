@@ -110,7 +110,7 @@ for model_path in model_paths:
     # lets get the specific seizure to test on
     seizure_number = int(re.sub("[^0-9]","",basename[-2:]))
     # specify timesteps to repeat input for snn
-    timesteps = 40
+    timesteps = 50
 
     print('testing snn for patient: ' + str(patient) + ' on seizure number: ' + str(seizure_number))
 
@@ -192,11 +192,12 @@ for model_path in model_paths:
         # no need for any training
         nengo_dl.configure_settings(
             trainable=None,
-            stateful=True,
+            stateful=False,
             keep_history=True,
         )
-        with nengo_dl.Simulator(converted.net,progress_bar=True) as sim:
+        with nengo_dl.Simulator(converted.net,progress_bar=True,minibatch_size=num_examples) as sim:
             #print(converted.net.probeable)
+            '''
             sim.compile(loss={converted.outputs[converted.model.output]:keras.losses.BinaryCrossentropy(from_logits=True)},
                         metrics={
                             converted.outputs[converted.model.output]:keras.metrics.TruePositives(name='tp'),
@@ -208,11 +209,14 @@ for model_path in model_paths:
                             converted.outputs[converted.model.output]:keras.metrics.Recall(name='recall'),
                             converted.outputs[converted.model.output]:keras.metrics.AUC(name='auc'),
                         })
-            if use_train:
-                train_pred = sim.predict(x=train_examples,n_steps=timesteps)
-            if use_val:
-                val_pred = sim.predict(x=validation_examples,n_steps=timesteps)
+            '''
             test_pred = sim.predict(x=examples,n_steps=timesteps)
+        if use_train:
+            with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=num_train_examples) as sim:
+                train_pred = sim.predict(x=train_examples, n_steps=timesteps)
+        if use_val:
+            with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=num_train_examples) as sim:
+                val_pred = sim.predict(x=validation_examples, n_steps=timesteps)
 
     test_pred = list(test_pred.values())[0]
 
