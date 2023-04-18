@@ -113,7 +113,7 @@ def convert_snn(saved_weights_directory=None):
     stripped_model = remove_dropout_layers_and_sigmoid(model)
     swap_activations = {tf.nn.leaky_relu: nengo_dl.SpikingLeakyReLU()}
     converted = nengo_dl.Converter(stripped_model, max_to_avg_pool=True, inference_only=True, allow_fallback=False,
-                                   swap_activations=swap_activations,synapse=0.01,scale_firing_rates=100)
+                                   swap_activations=swap_activations,synapse=0.01,scale_firing_rates=250)
     # need to comment out .verify() in order for execution to run
     # verify will fail for this model since we swap max to avg pool
     # print(converted.verify())
