@@ -215,7 +215,7 @@ for model_path in model_paths:
             with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=num_train_examples) as sim:
                 train_pred = sim.predict(x=train_examples, n_steps=timesteps)
         if use_val:
-            with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=num_train_examples) as sim:
+            with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=num_val_examples) as sim:
                 val_pred = sim.predict(x=validation_examples, n_steps=timesteps)
 
     test_pred = list(test_pred.values())[0]
