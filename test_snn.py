@@ -215,7 +215,7 @@ for model_path in model_paths:
             '''
             test_pred = sim.predict(x=examples,n_steps=timesteps)
 
-    non_snn_test_pred = non_snn_model.predict(examples[:,0,:],batch_size=32)
+    non_snn_test_pred = non_snn_model.predict(examples[:,0,:].reshape(-1,1,22,114),batch_size=32)
     if use_train:
         with converted.net:
             # no need for any training
@@ -227,7 +227,7 @@ for model_path in model_paths:
             )
             with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=num_train_examples) as sim:
                 train_pred = sim.predict(x=train_examples, n_steps=timesteps)
-        non_snn_train_pred = non_snn_model.predict(train_examples[:, 0, :], batch_size=32)
+        non_snn_train_pred = non_snn_model.predict(train_examples[:, 0, :].reshape(-1,1,22,114), batch_size=32)
 
     if use_val:
         with converted.net:
@@ -240,7 +240,7 @@ for model_path in model_paths:
             )
             with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=num_val_examples) as sim:
                 val_pred = sim.predict(x=validation_examples, n_steps=timesteps)
-        non_snn_val_pred = non_snn_model.predict(validation_examples[:, 0, :], batch_size=32)
+        non_snn_val_pred = non_snn_model.predict(validation_examples[:, 0, :].reshape(-1,1,22,114), batch_size=32)
 
 
     test_pred = list(test_pred.values())[0]
