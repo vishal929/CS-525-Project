@@ -216,7 +216,7 @@ for model_path in model_paths:
             test_pred = sim.predict(x=examples,n_steps=timesteps)
 
     non_snn_test_pred = non_snn_model.predict(examples[:,0,:].reshape(-1,1,22,114),batch_size=32)
-    non_snn_test_pred = round(non_snn_test_pred.flatten())
+    non_snn_test_pred = np.round(non_snn_test_pred.flatten())
     print('non_snn_test_pred shape: ' + str(non_snn_test_pred.shape))
     #non_snn_test_pred = np.greater(non_snn_test_pred,0.5).astype(np.int32)
 
@@ -233,7 +233,7 @@ for model_path in model_paths:
             with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=num_train_examples) as sim:
                 train_pred = sim.predict(x=train_examples, n_steps=timesteps)
         non_snn_train_pred = non_snn_model.predict(train_examples[:, 0, :].reshape(-1,1,22,114), batch_size=32)
-        non_snn_train_pred = round(non_snn_train_pred.flatten())
+        non_snn_train_pred = np.round(non_snn_train_pred.flatten())
         #non_snn_train_pred = np.greater(non_snn_train_pred,0.5).astype(np.int32)
         print('num train examples: ' + str(num_train_examples))
 
@@ -249,7 +249,7 @@ for model_path in model_paths:
             with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=num_val_examples) as sim:
                 val_pred = sim.predict(x=validation_examples, n_steps=timesteps)
         non_snn_val_pred = non_snn_model.predict(validation_examples[:, 0, :].reshape(-1,1,22,114), batch_size=32)
-        non_snn_val_pred = round(non_snn_val_pred.flatten())
+        non_snn_val_pred = np.round(non_snn_val_pred.flatten())
         print('non_snn val_pred shape: ' + str(non_snn_val_pred.shape))
         # converting non_snn_val_pred sigmoid values to actual predictions
         #non_snn_val_pred = np.greater(non_snn_val_pred,0.5).astype(np.int32)
@@ -263,7 +263,7 @@ for model_path in model_paths:
     test_pred = np.mean(test_pred,axis=-1)
 
     # if decoded value > 0.5 , then we give 0, if decoded value < 0.5, we give 1
-    test_pred = np.greater(test_pred,0.5).astype(np.int32)
+    test_pred = np.round(test_pred)
 
     # getting num predictions (in case input was truncated due to batch size)
     num_test = test_pred.shape[0]
@@ -277,7 +277,7 @@ for model_path in model_paths:
         train_pred = np.mean(train_pred, axis=-1)
 
         # if decoded value < 0.5 , then we give 0, if decoded value > 0.5, we give 1
-        train_pred = np.greater(train_pred, 0.5).astype(np.int32)
+        train_pred = np.round(train_pred)
         # getting num predictions(in case input was truncated due to batch size)
         num_train = train_pred.shape[0]
         train_labels = np.squeeze(train_labels[:num_train, 0, 0])
@@ -334,7 +334,7 @@ for model_path in model_paths:
         val_pred = np.mean(val_pred, axis=-1)
 
         # if decoded value < 0.5 , then we give 0, if decoded value > 0.5, we give 1
-        val_pred = np.greater(val_pred, 0).astype(np.int32)
+        val_pred = np.round(val_pred)
         # getting num predictions in case input was truncated due to batch size
         num_val = val_pred.shape[0]
         val_labels = np.squeeze(validation_labels[:num_val, 0, 0])
