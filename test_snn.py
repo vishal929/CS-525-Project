@@ -260,10 +260,10 @@ for model_path in model_paths:
 
     test_pred = np.squeeze(test_pred)
     # decoding by taking the mean activation
-    test_pred = np.mean(test_pred,axis=-1)
+    test_pred = np.mean(test_pred,axis=-1).flatten()
 
-    # if decoded value > 0.5 , then we give 0, if decoded value < 0.5, we give 1
-    test_pred = np.round(test_pred)
+    # if decoded value <0 , then we give 0, if decoded value >0, we give 1
+    test_pred = np.greater(test_pred,0).astype(np.int32)
 
     # getting num predictions (in case input was truncated due to batch size)
     num_test = test_pred.shape[0]
@@ -277,10 +277,10 @@ for model_path in model_paths:
 
         train_pred = np.squeeze(train_pred)
         # decoding by taking the mean activation
-        train_pred = np.mean(train_pred, axis=-1)
+        train_pred = np.mean(train_pred, axis=-1).flatten()
 
-        # if decoded value < 0.5 , then we give 0, if decoded value > 0.5, we give 1
-        train_pred = np.round(train_pred)
+        # if decoded value <= 0 , then we give 0, if decoded value >0, we give 1
+        train_pred = np.greater(train_pred,0).astype(np.int32)
         # getting num predictions(in case input was truncated due to batch size)
         num_train = train_pred.shape[0]
         train_labels = np.squeeze(train_labels[:num_train, 0, 0])
@@ -337,10 +337,10 @@ for model_path in model_paths:
 
         val_pred = np.squeeze(val_pred)
         # decoding by taking the mean activation
-        val_pred = np.mean(val_pred, axis=-1)
+        val_pred = np.mean(val_pred, axis=-1).flatten()
 
-        # if decoded value < 0.5 , then we give 0, if decoded value > 0.5, we give 1
-        val_pred = np.round(val_pred)
+        # if decoded value <= 0 , then we give 0, if decoded value > 0, we give 1
+        val_pred = np.greater(val_pred,0).astype(np.int32)
         # getting num predictions in case input was truncated due to batch size
         num_val = val_pred.shape[0]
         val_labels = np.squeeze(validation_labels[:num_val, 0, 0])
