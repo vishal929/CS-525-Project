@@ -96,7 +96,7 @@ window_size=1
 use_train = False
 use_val = True
 
-model_paths = Path.glob(Path(ROOT_DIR,'Trained Models'),'chb*----'+str(window_size)+'----seizure_number_*')
+model_paths = Path.glob(Path(ROOT_DIR,'Trained_Models'),'chb*----'+str(window_size)+'----seizure_number:*')
 model_paths = list(model_paths)
 
 # this dictionary holds mappings for each experiment i.e {patient_id:[exp_1 accuracy, exp2,accuracy]...}
@@ -111,7 +111,7 @@ for model_path in model_paths:
     # lets get the specific seizure to test on
     seizure_number = int(re.sub("[^0-9]","",basename[-2:]))
     # specify timesteps to repeat input for snn
-    timesteps = 50
+    timesteps = 30
 
     print('testing snn for patient: ' + str(patient) + ' on seizure number: ' + str(seizure_number))
 
@@ -230,7 +230,7 @@ for model_path in model_paths:
                 stateful=False,
                 keep_history=True,
             )
-            with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=num_train_examples) as sim:
+            with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=8) as sim:
                 train_pred = sim.predict(x=train_examples, n_steps=timesteps)
         non_snn_train_pred = non_snn_model.predict(train_examples[:, 0, :].reshape(-1,1,22,114), batch_size=32)
         non_snn_train_pred = np.round(non_snn_train_pred.flatten())
@@ -246,7 +246,7 @@ for model_path in model_paths:
                 stateful=False,
                 keep_history=True,
             )
-            with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=num_val_examples) as sim:
+            with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=8) as sim:
                 val_pred = sim.predict(x=validation_examples, n_steps=timesteps)
         non_snn_val_pred = non_snn_model.predict(validation_examples[:, 0, :].reshape(-1,1,22,114), batch_size=32)
         non_snn_val_pred = np.round(non_snn_val_pred.flatten())
