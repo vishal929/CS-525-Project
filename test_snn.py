@@ -234,6 +234,8 @@ for model_path in model_paths:
             with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=num_val_examples) as sim:
                 val_pred = sim.predict(x=validation_examples, n_steps=timesteps)
 
+
+
     test_pred = list(test_pred.values())[0]
 
     test_pred = np.squeeze(test_pred)
@@ -242,7 +244,10 @@ for model_path in model_paths:
 
     # if decoded value < 0 , then we give 0, if decoded value > 0, we give 1
     test_pred = np.greater_equal(test_pred,0).astype(np.int32)
-    labels = np.squeeze(labels[:,0,0])
+
+    # getting num predictions (in case input was truncated due to batch size)
+    num_test = test_pred.shape[0]
+    labels = np.squeeze(labels[:num_test,0,0])
 
     if use_train:
         train_pred = list(train_pred.values())[0]
@@ -253,7 +258,9 @@ for model_path in model_paths:
 
         # if decoded value < 0 , then we give 0, if decoded value > 0, we give 1
         train_pred = np.greater_equal(train_pred, 0).astype(np.int32)
-        train_labels = np.squeeze(train_labels[:, 0, 0])
+        # getting num predictions(in case input was truncated due to batch size)
+        num_train = train_pred.shape[0]
+        train_labels = np.squeeze(train_labels[:num_train, 0, 0])
 
         # getting false positives,false negatives, true negatives, and true positives
         train_fp = np.logical_and(np.equal(train_pred, 1), np.equal(train_labels, 0)).astype(np.int32).sum()
@@ -286,7 +293,9 @@ for model_path in model_paths:
 
         # if decoded value < 0 , then we give 0, if decoded value > 0, we give 1
         val_pred = np.greater_equal(val_pred, 0).astype(np.int32)
-        val_labels = np.squeeze(validation_labels[:, 0, 0])
+        # getting num predictions in case input was truncated due to batch size
+        num_val = val_pred.shape[0]
+        val_labels = np.squeeze(validation_labels[:num_val, 0, 0])
 
         # getting false positives,false negatives, true negatives, and true positives
         val_fp = np.logical_and(np.equal(val_pred, 1), np.equal(val_labels, 0)).astype(np.int32).sum()
