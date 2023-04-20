@@ -217,6 +217,8 @@ for model_path in model_paths:
 
     non_snn_test_pred = non_snn_model.predict(examples[:,0,:].reshape(-1,1,22,114),batch_size=32)
     non_snn_test_pred = np.greater(non_snn_test_pred,0.5).astype(np.int32)
+
+    print('num test examples: ' + str(num_examples))
     if use_train:
         with converted.net:
             # no need for any training
@@ -230,6 +232,7 @@ for model_path in model_paths:
                 train_pred = sim.predict(x=train_examples, n_steps=timesteps)
         non_snn_train_pred = non_snn_model.predict(train_examples[:, 0, :].reshape(-1,1,22,114), batch_size=32)
         non_snn_train_pred = np.greater(non_snn_train_pred,0.5).astype(np.int32)
+        print('num train examples: ' + str(num_train_examples))
 
     if use_val:
         with converted.net:
@@ -245,6 +248,7 @@ for model_path in model_paths:
         non_snn_val_pred = non_snn_model.predict(validation_examples[:, 0, :].reshape(-1,1,22,114), batch_size=32)
         # converting non_snn_val_pred sigmoid values to actual predictions
         non_snn_val_pred = np.greater(non_snn_val_pred,0.5).astype(np.int32)
+        print('num val examples: ' + str(num_val_examples))
 
 
     test_pred = list(test_pred.values())[0]
