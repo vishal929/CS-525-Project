@@ -269,6 +269,9 @@ for model_path in model_paths:
     num_test = test_pred.shape[0]
     labels = np.squeeze(labels[:num_test,0,0])
 
+    # truncating keras output if needed
+    non_snn_test_pred = non_snn_test_pred[:num_test]
+
     if use_train:
         train_pred = list(train_pred.values())[0]
 
@@ -303,6 +306,9 @@ for model_path in model_paths:
         # computing recall
         train_recall = train_tp / (train_tp + train_fn)
         print('train recall: ' + str(train_recall))
+
+        # truncating keras output if needed
+        non_snn_train_pred = non_snn_train_pred[:num_train]
 
         # getting false positives,false negatives, true negatives, and true positives
         non_snn_train_fp = np.logical_and(np.equal(non_snn_train_pred, 1), np.equal(train_labels, 0)).astype(np.int32).sum()
@@ -360,6 +366,9 @@ for model_path in model_paths:
         # computing recall
         val_recall = val_tp / (val_tp + val_fn)
         print('val recall: ' + str(val_recall))
+
+        # truncating keras output if needed
+        non_snn_val_pred = non_snn_val_pred[:num_val]
 
         # getting false positives,false negatives, true negatives, and true positives
         non_snn_val_fp = np.logical_and(np.equal(non_snn_val_pred, 1), np.equal(val_labels, 0)).astype(np.int32).sum()
