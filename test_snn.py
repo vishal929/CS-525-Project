@@ -216,8 +216,9 @@ for model_path in model_paths:
             test_pred = sim.predict(x=examples,n_steps=timesteps)
 
     non_snn_test_pred = non_snn_model.predict(examples[:,0,:].reshape(-1,1,22,114),batch_size=32)
-    print('non_snn_test_pred orig shape: ' + str(non_snn_test_pred.shape))
-    non_snn_test_pred = np.greater(non_snn_test_pred,0.5).astype(np.int32)
+    non_snn_test_pred = round(non_snn_test_pred.flatten())
+    print('non_snn_test_pred shape: ' + str(non_snn_test_pred.shape))
+    #non_snn_test_pred = np.greater(non_snn_test_pred,0.5).astype(np.int32)
 
     print('num test examples: ' + str(num_examples))
     if use_train:
@@ -232,7 +233,8 @@ for model_path in model_paths:
             with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=num_train_examples) as sim:
                 train_pred = sim.predict(x=train_examples, n_steps=timesteps)
         non_snn_train_pred = non_snn_model.predict(train_examples[:, 0, :].reshape(-1,1,22,114), batch_size=32)
-        non_snn_train_pred = np.greater(non_snn_train_pred,0.5).astype(np.int32)
+        non_snn_train_pred = round(non_snn_train_pred.flatten())
+        #non_snn_train_pred = np.greater(non_snn_train_pred,0.5).astype(np.int32)
         print('num train examples: ' + str(num_train_examples))
 
     if use_val:
@@ -247,9 +249,10 @@ for model_path in model_paths:
             with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=num_val_examples) as sim:
                 val_pred = sim.predict(x=validation_examples, n_steps=timesteps)
         non_snn_val_pred = non_snn_model.predict(validation_examples[:, 0, :].reshape(-1,1,22,114), batch_size=32)
+        non_snn_val_pred = round(non_snn_val_pred.flatten())
         print('non_snn val_pred shape: ' + str(non_snn_val_pred.shape))
         # converting non_snn_val_pred sigmoid values to actual predictions
-        non_snn_val_pred = np.greater(non_snn_val_pred,0.5).astype(np.int32)
+        #non_snn_val_pred = np.greater(non_snn_val_pred,0.5).astype(np.int32)
         print('num val examples: ' + str(num_val_examples))
 
 
