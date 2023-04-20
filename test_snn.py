@@ -118,10 +118,6 @@ for model_path in model_paths:
     converted = model.convert_snn(model_path)
     non_snn_model = keras.models.load_model(model_path)
 
-
-
-    exit()
-
     # we can throw out train and val, no need for that in evaluation
     train_set,validation_set,test_set = data_util.get_seizure_leave_out_data(seizure_number=seizure_number,
                                                         window_size=window_size,
