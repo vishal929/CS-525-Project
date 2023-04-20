@@ -101,6 +101,7 @@ model_paths = list(model_paths)
 
 # this dictionary holds mappings for each experiment i.e {patient_id:[exp_1 accuracy, exp2,accuracy]...}
 patient_accs = {}
+non_snn_patient_accs = {}
 
 for model_path in model_paths:
     model_path = str(model_path)
@@ -115,6 +116,7 @@ for model_path in model_paths:
     print('testing snn for patient: ' + str(patient) + ' on seizure number: ' + str(seizure_number))
 
     converted = model.convert_snn(model_path)
+    non_snn_model = keras.models.load_model(model_path)
 
     # we can throw out train and val, no need for that in evaluation
     train_set,validation_set,test_set = data_util.get_seizure_leave_out_data(seizure_number=seizure_number,
@@ -213,6 +215,7 @@ for model_path in model_paths:
             '''
             test_pred = sim.predict(x=examples,n_steps=timesteps)
 
+    non_snn_test_pred = non_snn_model.predict(examples[:,0,:],batch_size=32)
     if use_train:
         with converted.net:
             # no need for any training
@@ -224,6 +227,7 @@ for model_path in model_paths:
             )
             with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=num_train_examples) as sim:
                 train_pred = sim.predict(x=train_examples, n_steps=timesteps)
+        non_snn_train_pred = non_snn_model.predict(train_examples[:, 0, :], batch_size=32)
 
     if use_val:
         with converted.net:
@@ -236,7 +240,7 @@ for model_path in model_paths:
             )
             with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=num_val_examples) as sim:
                 val_pred = sim.predict(x=validation_examples, n_steps=timesteps)
-
+        non_snn_val_pred = non_snn_model.predict(validation_examples[:, 0, :], batch_size=32)
 
 
     test_pred = list(test_pred.values())[0]
@@ -287,6 +291,28 @@ for model_path in model_paths:
         train_recall = train_tp / (train_tp + train_fn)
         print('train recall: ' + str(train_recall))
 
+        # getting false positives,false negatives, true negatives, and true positives
+        non_snn_train_fp = np.logical_and(np.equal(non_snn_train_pred, 1), np.equal(train_labels, 0)).astype(np.int32).sum()
+        non_snn_train_tp = np.logical_and(np.equal(non_snn_train_pred, 1), np.equal(train_labels, 1)).astype(np.int32).sum()
+        non_snn_train_fn = np.logical_and(np.equal(non_snn_train_pred, 0), np.equal(train_labels, 1)).astype(np.int32).sum()
+        non_snn_train_tn = np.logical_and(np.equal(non_snn_train_pred, 0), np.equal(train_labels, 0)).astype(np.int32).sum()
+        print('non_snn train false positive: ' + str(non_snn_train_fp))
+        print('non_snn train true positive: ' + str(non_snn_train_tp))
+        print('non_snn train false negative: ' + str(non_snn_train_fn))
+        print('non_snn train true negative: ' + str(non_snn_train_tn))
+
+        # computing accuracy
+        non_snn_train_accuracy = np.equal(non_snn_train_pred, train_labels).astype(np.int32).mean()
+        print('non_snn_train accuracy: ' + str(non_snn_train_accuracy))
+
+        # computing precision
+        non_snn_train_precision = non_snn_train_tp / (non_snn_train_fp + non_snn_train_tp)
+        print('non_snn train precision: ' + str(non_snn_train_precision))
+
+        # computing recall
+        non_snn_train_recall = non_snn_train_tp / (non_snn_train_tp + non_snn_train_fn)
+        print('non_snn_train recall: ' + str(non_snn_train_recall))
+
     if use_val:
         val_pred = list(val_pred.values())[0]
 
@@ -322,15 +348,47 @@ for model_path in model_paths:
         val_recall = val_tp / (val_tp + val_fn)
         print('val recall: ' + str(val_recall))
 
+        # getting false positives,false negatives, true negatives, and true positives
+        non_snn_val_fp = np.logical_and(np.equal(non_snn_val_pred, 1), np.equal(val_labels, 0)).astype(np.int32).sum()
+        non_snn_val_tp = np.logical_and(np.equal(non_snn_val_pred, 1), np.equal(val_labels, 1)).astype(np.int32).sum()
+        non_snn_val_fn = np.logical_and(np.equal(non_snn_val_pred, 0), np.equal(val_labels, 1)).astype(np.int32).sum()
+        non_snn_val_tn = np.logical_and(np.equal(non_snn_val_pred, 0), np.equal(val_labels, 0)).astype(np.int32).sum()
+        print('non_snn_val false positive: ' + str(non_snn_val_fp))
+        print('non_snn_val true positive: ' + str(non_snn_val_tp))
+        print('non_snn_val false negative: ' + str(non_snn_val_fn))
+        print('non_snn_val true negative: ' + str(non_snn_val_tn))
+
+        # computing accuracy
+        non_snn_val_accuracy = np.equal(non_snn_val_pred, val_labels).astype(np.int32).mean()
+        print('non_snn val accuracy: ' + str(non_snn_val_accuracy))
+
+        # computing precision
+        non_snn_val_precision = non_snn_val_tp / (non_snn_val_fp + non_snn_val_tp)
+        print('non_snn val precision: ' + str(non_snn_val_precision))
+
+        # computing recall
+        non_snn_val_recall = non_snn_val_tp / (non_snn_val_tp + non_snn_val_fn)
+        print('non_snn val recall: ' + str(non_snn_val_recall))
+
     # test accuracy
     test_acc = np.equal(test_pred, labels).astype(np.int32).mean()
-    print('test accuracy: ' + str(test_acc))
+    print('snn test accuracy: ' + str(test_acc))
 
     # storing detection accuracy in dictionary so we can compute mean at the end
     if patient in patient_accs:
         (patient_accs[patient]).append(test_acc)
     else:
         patient_accs[patient] = [test_acc]
+
+    # test accuracy
+    non_snn_test_acc = np.equal(non_snn_test_pred, labels).astype(np.int32).mean()
+    print('non_snn test accuracy: ' + str(non_snn_test_acc))
+
+    # storing detection accuracy in dictionary so we can compute mean at the end
+    if patient in non_snn_patient_accs:
+        (non_snn_patient_accs[patient]).append(non_snn_test_acc)
+    else:
+        non_snn_patient_accs[patient] = [non_snn_test_acc]
 
     #print(pred.shape)
     #print(pred)
@@ -343,5 +401,8 @@ for model_path in model_paths:
 # computing patient accuracies for each experiment
 for patient in patient_accs:
     total_acc = np.array(patient_accs[patient]).mean()
-    print('testing accuracy on all experiments for patient: ' + str(patient) + ' acc: ' + str(total_acc))
+    print('snn testing accuracy on all experiments for patient: ' + str(patient) + ' acc: ' + str(total_acc))
+
+    non_snn_total_acc = np.array(non_snn_patient_accs[patient]).mean()
+    print('non_snn testing accuracy on all experiments for patient: ' + str(patient) + ' acc: ' + str(non_snn_total_acc))
 
