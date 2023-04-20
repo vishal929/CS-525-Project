@@ -191,7 +191,8 @@ for model_path in model_paths:
     with converted.net:
         # no need for any training
         nengo_dl.configure_settings(
-            trainable=None,
+            trainable=False,
+            inference_only=True,
             stateful=False,
             keep_history=True,
         )
@@ -216,7 +217,8 @@ for model_path in model_paths:
         with converted.net:
             # no need for any training
             nengo_dl.configure_settings(
-                trainable=None,
+                trainable=False,
+                inference_only=True,
                 stateful=False,
                 keep_history=True,
             )
@@ -227,7 +229,8 @@ for model_path in model_paths:
         with converted.net:
             # no need for any training
             nengo_dl.configure_settings(
-                trainable=None,
+                trainable=False,
+                inference_only=True,
                 stateful=False,
                 keep_history=True,
             )
