@@ -21,19 +21,19 @@ def newBuildModel():
     # For each channel, MaxPool2D() takes the max value within a designated window of the input of size (1, 2)
     x = keras.layers.AvgPool2D(pool_size=(1, 2), data_format="channels_first", padding='valid')(x)
     # Then, we normalize the max value just collected
-    #x = keras.layers.BatchNormalization()(x) #
+    x = keras.layers.BatchNormalization()(x) #
 
     # The second layer has 32 kernals of size (1, 3)
     x = keras.layers.Conv2D(32, (1, 3), strides=(1, 1), padding='valid', data_format="channels_first",
                             activation=tf.nn.leaky_relu)(x)
     x = keras.layers.AvgPool2D(pool_size=(1, 2), data_format="channels_first", )(x)
-    #x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.BatchNormalization()(x)
 
     # The third and last convolutional layer has 64 kernals also of size (1, 3)
     x = keras.layers.Conv2D(64, (1, 3), strides=(1, 1), padding='valid', data_format="channels_first",
                             activation=tf.nn.leaky_relu)(x)
     x = keras.layers.AvgPool2D(pool_size=(1, 2), data_format="channels_first", )(x)
-    #x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.BatchNormalization()(x)
 
     # To create the 2 fully connected layers, we first flatten the extracted features
     x = keras.layers.Flatten()(x)
