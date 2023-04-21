@@ -4,7 +4,7 @@ import nengo_dl
 import nengo
 import numpy as np
 from Data_Preparation import data_util
-from Models import model
+from Models import model,recurrent_model
 from constants import ROOT_DIR
 import os
 from pathlib import Path
@@ -95,8 +95,9 @@ window_size=1
 
 use_train = False
 use_val = True
+do_train = False
 
-model_paths = Path.glob(Path(ROOT_DIR,'Trained_Models'),'chb*----'+str(window_size)+'----seizure_number:*')
+model_paths = Path.glob(Path(ROOT_DIR,'Trained_Models'),'chb*----'+str(window_size)+'----seizure_number_*')
 model_paths = list(model_paths)
 
 # this dictionary holds mappings for each experiment i.e {patient_id:[exp_1 accuracy, exp2,accuracy]...}
@@ -111,14 +112,23 @@ for model_path in model_paths:
     # lets get the specific seizure to test on
     seizure_number = int(re.sub("[^0-9]","",basename[-2:]))
     # specify timesteps to repeat input for snn
-    timesteps = 30
+    if window_size==1:
+        timesteps = 30
+    else:
+        timesteps = 23
+    # specify synaptic filter
+    synapse=0.01
+    # specify scaling of firing rates
+    scale_firing_rates=1
 
     print('testing snn for patient: ' + str(patient) + ' on seizure number: ' + str(seizure_number))
 
-    converted = model.convert_snn(model_path)
+    if window_size==12:
+       converted = recurrent_model.convert_recurrent_snn(model_path,synapse,scale_firing_rates,do_train)
+    else:
+        converted = model.convert_snn(model_path,do_train)
     non_snn_model = keras.models.load_model(model_path)
 
-    # we can throw out train and val, no need for that in evaluation
     train_set,validation_set,test_set = data_util.get_seizure_leave_out_data(seizure_number=seizure_number,
                                                         window_size=window_size,
                                                         patient=patient)
@@ -143,11 +153,12 @@ for model_path in model_paths:
     labels = np.stack(labels)
 
 
-    # repeating examples and labels for a certain number of timesteps
-    examples = examples.reshape(num_examples,1,-1)
-    examples = np.tile(examples, (1,timesteps,1))
-    labels = np.expand_dims(labels,axis=-1).repeat(num_features,axis=-1)
-    labels = np.expand_dims(labels,axis=1).repeat(timesteps,axis=1)
+    # repeating examples and labels for a certain number of timesteps only if our window size is not 12
+    if window_size==1:
+        examples = examples.reshape(num_examples,1,-1)
+        examples = np.tile(examples, (1,timesteps,1))
+        labels = np.expand_dims(labels,axis=-1).repeat(num_features,axis=-1)
+        labels = np.expand_dims(labels,axis=1).repeat(timesteps,axis=1)
 
     # examples should be (num_examples,timesteps,22x114=2508)
     #print(examples.shape)
@@ -167,10 +178,11 @@ for model_path in model_paths:
         train_examples = np.stack(train_examples, axis=0)
         train_labels = np.stack(train_labels)
 
-        train_examples = train_examples.reshape(num_train_examples, 1, -1)
-        train_examples = np.tile(train_examples, (1, timesteps, 1))
-        train_labels = np.expand_dims(train_labels, axis=-1).repeat(num_features, axis=-1)
-        train_labels = np.expand_dims(train_labels, axis=1).repeat(timesteps, axis=1)
+        if window_size==1:
+            train_examples = train_examples.reshape(num_train_examples, 1, -1)
+            train_examples = np.tile(train_examples, (1, timesteps, 1))
+            train_labels = np.expand_dims(train_labels, axis=-1).repeat(num_features, axis=-1)
+            train_labels = np.expand_dims(train_labels, axis=1).repeat(timesteps, axis=1)
 
     if use_val:
         # prepping val data
@@ -185,42 +197,12 @@ for model_path in model_paths:
         validation_examples = np.stack(validation_examples, axis=0)
         validation_labels = np.stack(validation_labels)
 
-        validation_examples = validation_examples.reshape(num_val_examples, 1, -1)
-        validation_examples = np.tile(validation_examples, (1, timesteps, 1))
-        validation_labels = np.expand_dims(validation_labels, axis=-1).repeat(num_features, axis=-1)
-        validation_labels = np.expand_dims(validation_labels, axis=1).repeat(timesteps, axis=1)
+        if window_size==1:
+            validation_examples = validation_examples.reshape(num_val_examples, 1, -1)
+            validation_examples = np.tile(validation_examples, (1, timesteps, 1))
+            validation_labels = np.expand_dims(validation_labels, axis=-1).repeat(num_features, axis=-1)
+            validation_labels = np.expand_dims(validation_labels, axis=1).repeat(timesteps, axis=1)
 
-    with converted.net:
-        # no need for any training
-        nengo_dl.configure_settings(
-            trainable=False,
-            inference_only=True,
-            stateful=False,
-            keep_history=True,
-        )
-        with nengo_dl.Simulator(converted.net,progress_bar=True,minibatch_size=num_examples) as sim:
-            #print(converted.net.probeable)
-            '''
-            sim.compile(loss={converted.outputs[converted.model.output]:keras.losses.BinaryCrossentropy(from_logits=True)},
-                        metrics={
-                            converted.outputs[converted.model.output]:keras.metrics.TruePositives(name='tp'),
-                            converted.outputs[converted.model.output]:keras.metrics.FalsePositives(name='fp'),
-                            converted.outputs[converted.model.output]:keras.metrics.TrueNegatives(name='tn'),
-                            converted.outputs[converted.model.output]:keras.metrics.FalseNegatives(name='fn'),
-                            converted.outputs[converted.model.output]:keras.metrics.BinaryAccuracy(name='accuracy'),
-                            converted.outputs[converted.model.output]:keras.metrics.Precision(name='precision'),
-                            converted.outputs[converted.model.output]:keras.metrics.Recall(name='recall'),
-                            converted.outputs[converted.model.output]:keras.metrics.AUC(name='auc'),
-                        })
-            '''
-            test_pred = sim.predict(x=examples,n_steps=timesteps)
-
-    non_snn_test_pred = non_snn_model.predict(examples[:,0,:].reshape(-1,1,22,114),batch_size=32)
-    non_snn_test_pred = np.round(non_snn_test_pred.flatten())
-    print('non_snn_test_pred shape: ' + str(non_snn_test_pred.shape))
-    #non_snn_test_pred = np.greater(non_snn_test_pred,0.5).astype(np.int32)
-
-    print('num test examples: ' + str(num_examples))
     if use_train:
         with converted.net:
             # no need for any training
@@ -231,11 +213,44 @@ for model_path in model_paths:
                 keep_history=True,
             )
             with nengo_dl.Simulator(converted.net, progress_bar=True, minibatch_size=8) as sim:
+                sim.compile(
+                    loss={converted.outputs[converted.model.output]: keras.losses.BinaryCrossentropy(from_logits=True)},
+                    metrics={
+                        converted.outputs[converted.model.output]: keras.metrics.TruePositives(name='tp'),
+                        converted.outputs[converted.model.output]: keras.metrics.FalsePositives(name='fp'),
+                        converted.outputs[converted.model.output]: keras.metrics.TrueNegatives(name='tn'),
+                        converted.outputs[converted.model.output]: keras.metrics.FalseNegatives(name='fn'),
+                        converted.outputs[converted.model.output]: keras.metrics.BinaryAccuracy(name='accuracy'),
+                        converted.outputs[converted.model.output]: keras.metrics.Precision(name='precision'),
+                        converted.outputs[converted.model.output]: keras.metrics.Recall(name='recall'),
+                        converted.outputs[converted.model.output]: keras.metrics.AUC(name='auc'),
+                    })
+                if do_train:
+                    sim.fit(x=train_examples,y=train_labels,n_steps=timesteps)
                 train_pred = sim.predict(x=train_examples, n_steps=timesteps)
-        non_snn_train_pred = non_snn_model.predict(train_examples[:, 0, :].reshape(-1,1,22,114), batch_size=32)
+        non_snn_train_pred = non_snn_model.predict(train_examples[:, 0, :].reshape(-1, 1, 22, 114), batch_size=32)
         non_snn_train_pred = np.round(non_snn_train_pred.flatten())
-        #non_snn_train_pred = np.greater(non_snn_train_pred,0.5).astype(np.int32)
+        # non_snn_train_pred = np.greater(non_snn_train_pred,0.5).astype(np.int32)
         print('num train examples: ' + str(num_train_examples))
+
+    with converted.net:
+        # no need for any training
+        nengo_dl.configure_settings(
+            trainable=True,
+            inference_only=False,
+            stateful=False,
+            keep_history=True,
+        )
+        with nengo_dl.Simulator(converted.net,progress_bar=True,minibatch_size=8) as sim:
+            test_pred = sim.predict(x=examples,n_steps=timesteps)
+
+    non_snn_test_pred = non_snn_model.predict(examples[:,0,:].reshape(-1,1,22,114),batch_size=32)
+    non_snn_test_pred = np.round(non_snn_test_pred.flatten())
+    print('non_snn_test_pred shape: ' + str(non_snn_test_pred.shape))
+    #non_snn_test_pred = np.greater(non_snn_test_pred,0.5).astype(np.int32)
+
+    print('num test examples: ' + str(num_examples))
+
 
     if use_val:
         with converted.net:
@@ -279,7 +294,7 @@ for model_path in model_paths:
         # decoding by taking the mean activation
         train_pred = np.mean(train_pred, axis=-1).flatten()
 
-        # if decoded value <= 0 , then we give 0, if decoded value >0, we give 1
+        # if decoded value <= 0 , then we give 0, if decoded value >0, we give 1 (this is because we removed the sigmoid)
         train_pred = np.greater(train_pred,0).astype(np.int32)
         # getting num predictions(in case input was truncated due to batch size)
         num_train = train_pred.shape[0]

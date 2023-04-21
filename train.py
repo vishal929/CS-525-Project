@@ -87,7 +87,8 @@ if specific_patient:
                                                                            patient=leave_out)
 
         if window_size == 1:
-            model_to_train = model.buildModel()
+            model_to_train = model.newBuildModel()
+            #model_to_train = model.buildModel() # this model has hard time with conversion
         else:
             model_to_train = recurrent_model.build_lmu(256, 784, 256, num_lmus=2)
         trained_model_results = train(model_to_train, tf_dataset, val_set, model_specific_name, batch_size=batch_size)
@@ -110,7 +111,8 @@ else:
         model_to_train = tf.keras.models.load_model(possible_checkpoint)
     else:
         if window_size==1:
-            model_to_train = model.buildModel()
+            model_to_train = model.newBuildModel()
+            #model_to_train = model.buildModel() # this model has trouble with conversion
         else:
             model_to_train = recurrent_model.build_lmu(256,784,256,num_lmus=2)
 
