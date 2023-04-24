@@ -94,7 +94,7 @@ def buildModel():
 window_size=1
 
 use_train = False
-use_val = True
+use_val = False
 do_train = False
 
 model_paths = Path.glob(Path(ROOT_DIR,'Trained_Models'),'chb*----'+str(window_size)+'----seizure_number_*')
@@ -236,12 +236,12 @@ for model_path in model_paths:
     with converted.net:
         # no need for any training
         nengo_dl.configure_settings(
-            trainable=True,
-            inference_only=False,
+            trainable=False,
+            inference_only=True,
             stateful=False,
             keep_history=True,
         )
-        with nengo_dl.Simulator(converted.net,progress_bar=True,minibatch_size=8) as sim:
+        with nengo_dl.Simulator(converted.net,progress_bar=True,minibatch_size=num_examples) as sim:
             test_pred = sim.predict(x=examples,n_steps=timesteps)
 
     non_snn_test_pred = non_snn_model.predict(examples[:,0,:].reshape(-1,1,22,114),batch_size=32)

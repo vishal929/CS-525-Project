@@ -178,10 +178,10 @@ def convert_snn(saved_weights_directory=None,synapse=None,scale_firing_rates=100
     stripped_model = remove_dropout_layers_and_sigmoid(model)
     swap_activations = {tf.nn.leaky_relu: nengo_dl.SpikingLeakyReLU()}
     if do_training:
-        converted = nengo_dl.Converter(stripped_model, max_to_avg_pool=True, inference_only=False, allow_fallback=False,
+        converted = nengo_dl.Converter(stripped_model, max_to_avg_pool=False, inference_only=False, allow_fallback=False,
                                    swap_activations=swap_activations,synapse=synapse,scale_firing_rates=scale_firing_rates)
     else:
-        converted = nengo_dl.Converter(stripped_model, max_to_avg_pool=True, inference_only=True, allow_fallback=False,
+        converted = nengo_dl.Converter(stripped_model, max_to_avg_pool=False, inference_only=True, allow_fallback=False,
                                        swap_activations=swap_activations, synapse=synapse,
                                        scale_firing_rates=scale_firing_rates)
     # need to comment out .verify() in order for execution to run
