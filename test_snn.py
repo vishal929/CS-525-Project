@@ -119,7 +119,7 @@ for model_path in model_paths:
     # specify synaptic filter
     synapse=0.01
     # specify scaling of firing rates
-    scale_firing_rates=1
+    scale_firing_rates=1000
 
     print('testing snn for patient: ' + str(patient) + ' on seizure number: ' + str(seizure_number))
 
