@@ -25,7 +25,7 @@ def train(model, tf_dataset, val_set, model_save_name, batch_size=32):
     )
 
     # we want to save the state of the model while training (we save the entire model to allow for continuing training)
-    checkpoint_path = os.path.join(ROOT_DIR, 'Trained Models', model_save_name)
+    checkpoint_path = os.path.join(ROOT_DIR, 'Trained_Models', model_save_name)
 
     # we only save the model with the best combined train and validation auc so far
     save_weights = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
@@ -87,7 +87,8 @@ if specific_patient:
                                                                            patient=leave_out)
 
         if window_size == 1:
-            model_to_train = model.buildModel()
+            model_to_train = model.newBuildModel()
+            #model_to_train = model.buildModel() # this model has hard time with conversion
         else:
             model_to_train = recurrent_model.build_lmu(256, 784, 256, num_lmus=2)
         trained_model_results = train(model_to_train, tf_dataset, val_set, model_specific_name, batch_size=batch_size)
@@ -105,12 +106,13 @@ else:
 
     # check if we are continuing training
     # if we are continuing, load the model, otherwise create a new one
-    possible_checkpoint =os.path.join(ROOT_DIR, 'Trained Models', model_saved_name)
+    possible_checkpoint =os.path.join(ROOT_DIR, 'Trained_Models', model_saved_name)
     if os.path.exists(possible_checkpoint):
         model_to_train = tf.keras.models.load_model(possible_checkpoint)
     else:
         if window_size==1:
-            model_to_train = model.buildModel()
+            model_to_train = model.newBuildModel()
+            #model_to_train = model.buildModel() # this model has trouble with conversion
         else:
             model_to_train = recurrent_model.build_lmu(256,784,256,num_lmus=2)
 
