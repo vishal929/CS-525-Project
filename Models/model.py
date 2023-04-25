@@ -193,7 +193,7 @@ def convert_snn(saved_weights_directory=None,synapse=None,scale_firing_rates=100
     # batch size x timesteps x channel x H x W
     rand_inputs = []
     for i in range(20):
-        rand_inputs.append(np.random.rand(1,22,114))
+        rand_inputs.append(np.random.rand(3,1,22,114))
     print(converted.net.all_nodes)
     assert converted.verify(inputs=rand_inputs)
 
