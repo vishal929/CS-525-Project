@@ -1,7 +1,6 @@
 import tensorflow as tf
 from tensorflow import keras
 import nengo_dl
-import nengo
 import numpy as np
 from Data_Preparation import data_util
 from Models import model,recurrent_model
@@ -11,6 +10,8 @@ from pathlib import Path
 import re
 #from keras_data_format_converter import convert_channels_first_to_last
 
+print(tf.config.get_visible_devices())
+
 # globbing for saved model paths of this specific window_size
 window_size=1
 
@@ -18,7 +19,7 @@ use_train = False
 use_val = False
 do_train = False
 
-model_paths = Path.glob(Path(ROOT_DIR,'Trained_Models'),'chb*----'+str(window_size)+'----seizure_number_*')
+model_paths = Path.glob(Path(ROOT_DIR,'Trained_Models'),'chb*----'+str(window_size)+'----seizure_number:*')
 model_paths = list(model_paths)
 
 # this dictionary holds mappings for each experiment i.e {patient_id:[exp_1 accuracy, exp2,accuracy]...}
