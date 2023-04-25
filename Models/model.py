@@ -187,6 +187,11 @@ def convert_snn(saved_weights_directory=None,synapse=None,scale_firing_rates=100
     # need to comment out .verify() in order for execution to run
     # verify will fail for this model since we swap max to avg pool
     # print(converted.verify())
+    for ensemble in converted.net.ensembles:
+        print(ensemble, ensemble.neuron_type)
+
+    assert converted.verify()
+
     return converted
 
 
