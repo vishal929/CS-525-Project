@@ -35,20 +35,20 @@ for model_path in model_paths:
     seizure_number = int(re.sub("[^0-9]","",basename[-2:]))
     # specify timesteps to repeat input for snn
     if window_size==1:
-        timesteps = 200
+        timesteps = 30
     else:
         timesteps = 23
     # specify synaptic filter
-    synapse=0.01
+    synapse=None
     # specify scaling of firing rates
-    scale_firing_rates=250
+    scale_firing_rates=1
 
     print('testing snn for patient: ' + str(patient) + ' on seizure number: ' + str(seizure_number))
 
     if window_size==12:
        converted = recurrent_model.convert_recurrent_snn(model_path,synapse,scale_firing_rates,do_train)
     else:
-        converted = model.convert_snn(model_path,do_train)
+        converted = model.convert_snn(model_path,synapse,scale_firing_rates,do_train)
     non_snn_model = keras.models.load_model(model_path)
 
     train_set,validation_set,test_set = data_util.get_seizure_leave_out_data(seizure_number=seizure_number,
