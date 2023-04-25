@@ -194,6 +194,7 @@ def convert_snn(saved_weights_directory=None,synapse=None,scale_firing_rates=100
     rand_inputs = []
     for i in range(20):
         rand_inputs.append(np.random.rand(1,22,114))
+    print(converted.net.all_nodes)
     assert converted.verify(inputs=rand_inputs)
 
     return converted
