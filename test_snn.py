@@ -162,6 +162,7 @@ for model_path in model_paths:
             inference_only=True,
             stateful=False,
             keep_history=True,
+            planner=nengo_dl.graph_optimizer.noop_planner
         )
         with nengo_dl.Simulator(converted.net,progress_bar=True,minibatch_size=num_examples) as sim:
             test_pred = sim.predict(x=examples,n_steps=timesteps)
