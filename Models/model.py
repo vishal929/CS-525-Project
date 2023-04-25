@@ -190,7 +190,8 @@ def convert_snn(saved_weights_directory=None,synapse=None,scale_firing_rates=100
     for ensemble in converted.net.ensembles:
         print(ensemble, ensemble.neuron_type)
 
-    assert converted.verify()
+    # batch size x timesteps x channel x H x W
+    assert converted.verify(inputs=np.random.rand(3,20,1,22,114))
 
     return converted
 
