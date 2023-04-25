@@ -191,7 +191,10 @@ def convert_snn(saved_weights_directory=None,synapse=None,scale_firing_rates=100
         print(ensemble, ensemble.neuron_type)
 
     # batch size x timesteps x channel x H x W
-    assert converted.verify(inputs=np.random.rand(3,20,1,22,114))
+    rand_inputs = []
+    for i in range(20):
+        rand_inputs.append(np.random.rand(3,20,1,22,114))
+    assert converted.verify(inputs=rand_inputs)
 
     return converted
 
