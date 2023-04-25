@@ -176,7 +176,7 @@ def convert_snn(saved_weights_directory=None,synapse=None,scale_firing_rates=100
         model = buildModel()
     # need to remove dropout layers because they are not supported in nengo
     stripped_model = remove_dropout_layers_and_sigmoid(model)
-    swap_activations = {tf.nn.leaky_relu: nengo_dl.SpikingLeakyReLU()}
+    swap_activations = {tf.nn.leaky_relu: nengo_dl.SpikingLeakyReLU(negative_slope=0.2)}
     if do_training:
         converted = nengo_dl.Converter(stripped_model, max_to_avg_pool=False, inference_only=False, allow_fallback=False,
                                    swap_activations=swap_activations,synapse=synapse,scale_firing_rates=scale_firing_rates)
@@ -190,12 +190,8 @@ def convert_snn(saved_weights_directory=None,synapse=None,scale_firing_rates=100
     for ensemble in converted.net.ensembles:
         print(ensemble, ensemble.neuron_type)
 
-    # batch size x timesteps x channel x H x W
-    rand_inputs = []
-    for i in range(20):
-        rand_inputs.append(np.random.rand(3,1,22,114))
     print(converted.net.all_nodes)
-    assert converted.verify(inputs=rand_inputs)
+    assert converted.verify(inputs=[np.random.rand(3,1,22,114)])
 
     return converted
 
