@@ -34,8 +34,6 @@ def preprocess_metadata():
                 # need to generate timestamps for record_list since these are not given
                 record_list = generate_timesteps(record_list, 'chb24')
             final_mapping[os.path.dirname(summary_file)] = record_list
-            # final_mapping[os.path.basename(summary_file)[:5]] = record_list
-            # final_mapping.update(get_seizure_timestamps(summary_file))
         # combining dictionaries into 1 and then we can keep this object as a pickle object
         # writing the pickle to filesystem
         pickle_file = open(Path('./Processed_Data/summary.pickle'), 'wb')
@@ -148,9 +146,7 @@ def process_leave_out_one_data(window_size=1,size_threshold=None):
                 # we should save this array
                 interictal_train = np.concatenate(interictal_train, axis=0, dtype=np.float32)
                 # 22 channels
-                # assert interictal_train.shape[1] == 22
                 # 114 frequencies in frequency domain
-                # assert interictal_train.shape[2] == 114
                 train_save_count += 1
                 np.save(os.path.join('.', 'Processed_Data', patient_id,
                                      str(window_size) + '-' + str(train_save_count) + '-interictal_train.npy'),
@@ -166,10 +162,6 @@ def process_leave_out_one_data(window_size=1,size_threshold=None):
             if num_val_processed > save_threshold or len(interictal) == 0:
                 # we should save this array
                 interictal_val = np.concatenate(interictal_val, axis=0, dtype=np.float32)
-                # 22 channels
-                # assert interictal_val.shape[1] == 22
-                # 114 frequencies in frequency domain
-                # assert interictal_val.shape[2] == 114
                 val_save_count += 1
                 np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-' + str(val_save_count) \
                                      + '-interictal_val.npy'),
@@ -227,7 +219,6 @@ def process_data(window_size=1,size_threshold=None):
                 continue
             # 75% sent to train, 25% sent to validation
             train, val = np.split(windows, [int(len(windows) * 0.75)])
-            #train, val = stft_recordings(train), stft_recordings(val)
 
             # adding to data pool
             ictal_train.append(train)
@@ -239,10 +230,6 @@ def process_data(window_size=1,size_threshold=None):
             if num_train_processed > save_threshold or len(ictal) == 0:
                 # we should save this array
                 ictal_train = np.concatenate(ictal_train, axis=0, dtype=np.float32)
-                # 22 channels
-                #assert ictal_train.shape[1] == 22
-                # 114 frequencies in frequency domain
-                #assert ictal_train.shape[2] == 114
                 train_save_count += 1
                 np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-'+str(train_save_count)+'-ictal_train.npy'),
                         ictal_train)
@@ -256,10 +243,6 @@ def process_data(window_size=1,size_threshold=None):
             if num_val_processed > save_threshold or len(ictal)==0:
                 # we should save this array
                 ictal_val = np.concatenate(ictal_val, axis=0, dtype=np.float32)
-                # 22 channels
-                #assert ictal_val.shape[1] == 22
-                # 114 frequencies in frequency domain
-                #assert ictal_val.shape[2] == 114
                 val_save_count += 1
                 np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-' + str(val_save_count) \
                                      + '-ictal_val.npy'),
@@ -288,8 +271,6 @@ def process_data(window_size=1,size_threshold=None):
                 continue
             train, val = np.split(windows, [int(len(windows) * 0.75)])
 
-            #train, val = stft_recordings(train), stft_recordings(val)
-
             # adding to data pool
             interictal_train.append(train)
             interictal_val.append(val)
@@ -300,10 +281,6 @@ def process_data(window_size=1,size_threshold=None):
             if num_train_processed > save_threshold or len(interictal) == 0:
                 # we should save this array
                 interictal_train = np.concatenate(interictal_train, axis=0, dtype=np.float32)
-                # 22 channels
-                #assert interictal_train.shape[1] == 22
-                # 114 frequencies in frequency domain
-                #assert interictal_train.shape[2] == 114
                 train_save_count += 1
                 np.save(os.path.join('.', 'Processed_Data', patient_id,
                                      str(window_size) + '-' + str(train_save_count) + '-interictal_train.npy'),
@@ -318,10 +295,6 @@ def process_data(window_size=1,size_threshold=None):
             if num_val_processed > save_threshold or len(interictal) == 0:
                 # we should save this array
                 interictal_val = np.concatenate(interictal_val, axis=0, dtype=np.float32)
-                # 22 channels
-                #assert interictal_val.shape[1] == 22
-                # 114 frequencies in frequency domain
-                #assert interictal_val.shape[2] == 114
                 val_save_count += 1
                 np.save(os.path.join('.', 'Processed_Data', patient_id, str(window_size) + '-' + str(val_save_count) \
                                      + '-interictal_val.npy'),
@@ -469,19 +442,11 @@ def generate_timesteps(file_summary_object, patient_name):
         # dividing samples by the sampling rate to get the time elapsed in seconds
         seconds_elapsed = int(num_samples / sampling_frequency)
         start_time = start_seconds
-        '''
-        start_min, mod_sec = divmod(start_seconds, 60)
-        start_hour, start_min = divmod(start_min, 60)
-        start_time = (start_hour, start_min, mod_sec)
-        '''
+        
         # incrementing start time with elapsed time
         start_seconds += seconds_elapsed
         end_time = start_seconds
-        '''
-        end_min, mod_sec = divmod(start_seconds, 60)
-        end_hour, end_min = divmod(end_min, 60)
-        end_time = (end_hour, end_min, mod_sec)
-        '''
+        
         # updating list
         file_summary_object[i][filename][0] = (start_time, end_time)
     # returning the modified file_summary_object (this should include non-NONE timestamps)
@@ -502,7 +467,6 @@ def split_eeg_into_classes(patient_metadata_list, par_path):
             seizure_start_adjusted = time_data[i][0] + start_sec
             seizure_end_adjusted = time_data[i][1] + start_sec
             seizure_absolutes.append((seizure_start_adjusted, seizure_end_adjusted))
-    # print(len(seizure_absolutes))
     # creating a dictionary of invalid timesteps for quick lookup
     # 4 hours is 14400 seconds
     invalid_times = set([])
@@ -512,9 +476,7 @@ def split_eeg_into_classes(patient_metadata_list, par_path):
         # invalid range is not inclusive
         invalid = np.arange(seizure_start - 14400 + 1, seizure_end + 14400 - 1)
         invalid_times.update(set(invalid))
-    # print(len(invalid_times))
 
-    # print('invalid times set created!')
     # now that we have seizure absolute timesteps for this patient, we can extract ictal and interictal from each file
     # reminder, we extract all ictal data and only interictal data 4 hours before or after any seizure
     ictal_segments = []
@@ -588,7 +550,6 @@ def window_recordings(eeg_raw_data, sampling_frequency=256, window_size=12):
         # we want to break if the window is less than our desired window size by splicing
         if window.shape[1] < sampling_frequency * window_size:
             break
-        # print(window.shape)
         new_data.append(window)
         # moving the window by just 1 second
         curr_window += sampling_frequency
@@ -609,8 +570,6 @@ def stft_recordings(eeg_window, sampling_frequency=256, window=256, overlap=None
     _, _, frequencies = signal.stft(eeg_window, fs=sampling_frequency, nperseg=window, noverlap=overlap)
     # removing the start and end times from the time dimension (last dimension) to be consistent with the paper
     frequencies = np.delete(frequencies, [0, frequencies.shape[len(frequencies.shape) - 1] - 1], axis=-1)
-    # frequencies = frequencies[:, :, 1:-1]
-
     # removing DC component (0 Hz), the 57-63Hz and 117-123Hz bands (specific for chb-mit dataset)
     frequencies = np.delete(frequencies, [0, *[i for i in range(57, 64, 1)], *[i for i in range(117, 124, 1)]], axis=-2)
 
@@ -673,9 +632,5 @@ def grab_missing_records(record_list):
         idx2 += 1
     return new_record_list
 
-
-'''
-    Below is some basic logic I wrote while testing stuff
-'''
 
 process_leave_out_one_data(window_size=1,size_threshold=None)

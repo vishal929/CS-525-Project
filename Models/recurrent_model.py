@@ -3,7 +3,6 @@
 
 import nengo
 import nengo_dl
-# from nengo.utils.filter_design import cont2discrete
 from scipy.signal import cont2discrete
 import numpy as np
 import tensorflow as tf
@@ -22,9 +21,7 @@ class KerasLMU(tf.keras.layers.Layer):
         self.trainable_A = trainable_A
         self.trainable_B = trainable_B
         self.timesteps = 23
-        # LMU's have a state (using previous memory and hidden state)
-        # self.memory = tf.Variable(initial_value=tf.zeros((order,1)))
-        # self.hidden_state = tf.Variable(initial_value=tf.zeros((hidden_dim,1)))
+
         # creating A and B matrices
         A, B = get_state_space_matrices(order, theta)
         A = tf.convert_to_tensor(A, dtype=tf.float32)
@@ -153,7 +150,6 @@ def build_lmu(order, theta, hidden_dim, num_lmus=1):
     model = tf.keras.Model(input, output)
     # Finally, we compute the cross-entropy loss between true labels and predicted labels to account for
     # the class imbalance between seizure and non-seizure depicting data
-    # loss_func = keras.losses.categorical_crossentropy
     loss_func = tf.keras.losses.BinaryCrossentropy()
     optim = tf.keras.optimizers.RMSprop(learning_rate=0.00001)
     metrics = [
@@ -181,7 +177,6 @@ def remove_lambda_layer_and_sigmoid(model):
         if not isinstance(l, tf.keras.layers.Lambda):
             x = l(x)
     new_model = tf.keras.Model(input_layer.input, x)
-    # print(new_model.summary())
     return new_model
 
 
@@ -193,7 +188,6 @@ def convert_recurrent_snn(saved_weights_directory=None, synapse=None, scale_firi
     else:
         model = build_lmu(order=256, theta=784, hidden_dim=256, num_lmus=2)
     # need to remove dropout layers because they are not supported in nengo
-    # stripped_model = remove_dropout_layers(model)
     stripped_model = remove_lambda_layer_and_sigmoid(model)
     swap_activations = {tf.nn.leaky_relu: nengo_dl.SpikingLeakyReLU()}
     if do_training:
@@ -258,36 +252,3 @@ class ConvertLambda(nengo_dl.converter.LayerConverter):
         # connect input to hidden node
         self.add_connection(node_id, output)
         return output
-
-'''
-converter = convert_recurrent_snn()
-with nengo.Network() as net:
-    # no need for any training
-    nengo_dl.configure_settings(
-        trainable=None,
-        stateful=True,
-        keep_history=True,
-    )
-    with nengo_dl.Simulator(converter.net) as sim:
-
-        print(sim.predict(x=np.ones(shape=(2,23,2508))))
-
-'''
-'''
-model = build_lmu(256,784,256,num_lmus=2)
-print(model.predict_on_batch(tf.random.normal(shape=(2,23,2508),dtype=tf.float32)))
-
-
-trainable_count = int(
-    sum(K.count_params(layer) for layer in model.trainable_weights))
-non_trainable_count = int(
-    sum(K.count_params(layer) for layer in model.non_trainable_weights))
-
-print('Total params: {:,}'.format(trainable_count + non_trainable_count))
-print('Trainable params: {:,}'.format(trainable_count))
-print('Non-trainable params: {:,}'.format(non_trainable_count))
-'''
-
-# converted = nengo_dl.Converter(model)
-
-# model = build_lmu(256,784,256,num_lmus=2)

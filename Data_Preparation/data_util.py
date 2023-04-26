@@ -1,5 +1,4 @@
 import os
-
 import tensorflow as tf
 from pathlib import Path
 import numpy as np
@@ -12,17 +11,12 @@ from constants import ROOT_DIR
 # 0 will be for interictal, 1 will be for ictal
 def npy_to_tf(filename):
     filename_str = filename.numpy()
-    #print(filename_str)
     data = np.load(filename_str)
     if tf.strings.regex_full_match(filename,'.*interictal.*'):
-        #labels = np.zeros(shape = (data.shape[0]))
         labels = tf.zeros(shape = (data.shape[0]),dtype=tf.uint8)
     else:
-        #labels = np.ones(shape = (data.shape[0]),dtype = np.int8)
         labels = tf.ones(shape=(data.shape[0]), dtype=tf.uint8)
 
-    #print(data[0].shape)
-    #print(data)
     data = tf.convert_to_tensor(data,dtype=tf.float32)
 
     return data,labels
@@ -43,7 +37,7 @@ def stft_samples(tf_tensor):
 # we specify a split (either 'train','val','test')
 # we specify a window size
 # we specify a patient to leave out i.e if we specify 'chb01' then patient 1 is not included in train or val
-# # this patient will be included in the test set
+# this patient will be included in the test set
 def tf_dataset(split='train',window_size=1,leave_out='chb01'):
     split = split.strip().lower()
     if split not in {'test','val','train'}:
@@ -53,7 +47,6 @@ def tf_dataset(split='train',window_size=1,leave_out='chb01'):
         dataset_glob_path = os.path.join(ROOT_DIR,'Data_Preparation','Processed_Data','*'
                                          ,str(window_size)+'-'+'*'+split+'.npy')
         dataset = tf.data.Dataset.list_files(dataset_glob_path)
-        #dataset = tf.data.Dataset.list_files(ROOT_DIR'./Processed_Data/*/'+str(window_size)+'-'+'*'+split+'.npy')
         dataset_list = list(dataset)
         filtered_list = []
         for data in dataset_list:
@@ -67,7 +60,6 @@ def tf_dataset(split='train',window_size=1,leave_out='chb01'):
         dataset_glob_path = os.path.join(ROOT_DIR, 'Data_Preparation', 'Processed_Data', leave_out
                                          , str(window_size) + '-*.npy')
         dataset = tf.data.Dataset.list_files(dataset_glob_path)
-        #dataset = tf.data.Dataset.list_files('./Processed_Data/'+leave_out+'/'+str(window_size)+'*.npy')
     # converting filename to batched numpy array and batched label tensors
     dataset = dataset.map(lambda x: tf.py_function(npy_to_tf,inp=[x],Tout=[tf.float32,tf.uint8]),
                           num_parallel_calls=4)
@@ -82,7 +74,6 @@ def tf_dataset(split='train',window_size=1,leave_out='chb01'):
         examples= examples.map(lambda example: tf.expand_dims(example,axis=0),num_parallel_calls=4)
     labels = dataset.flat_map(lambda example,label: tf.data.Dataset.from_tensor_slices(label))
     # need to provide labels as a one-hot-encoding in keras api
-    #labels = labels.map(lambda label: tf.one_hot(label,depth=2),num_parallel_calls=tf.data.AUTOTUNE)
     # zipping together flattened examples to form final dataset
     dataset = tf.data.Dataset.zip((examples,labels))
     # adding sample weighting for imbalances only for the training set
@@ -95,7 +86,6 @@ def tf_dataset(split='train',window_size=1,leave_out='chb01'):
         interictals = dataset.filter(lambda example,label: label==0)
         interictals=interictals.map(lambda example,label: (example,label,1))
         dataset = ictals.concatenate(interictals)
-        #dataset = dataset.map(lambda example,label: add_sample_weighting(example,imbalance))
     return dataset
 
 # function that gives class counts for a binary classification task
@@ -177,7 +167,6 @@ def get_seizure_leave_out_data(seizure_number,window_size=1,patient='chb01'):
     test_labels = test.flat_map(lambda example, label: tf.data.Dataset.from_tensor_slices(label))
 
     # need to provide labels as a one-hot-encoding in keras api
-    # labels = labels.map(lambda label: tf.one_hot(label,depth=2),num_parallel_calls=tf.data.AUTOTUNE)
     # zipping together flattened examples to form final dataset
     train = tf.data.Dataset.zip((train_examples, train_labels))
     val = tf.data.Dataset.zip((val_examples, val_labels))
@@ -193,14 +182,3 @@ def get_seizure_leave_out_data(seizure_number,window_size=1,patient='chb01'):
     train = ictals.concatenate(interictals)
 
     return train,val,test
-
-'''
-train,val,test = get_seizure_leave_out_data(1)
-print(train.reduce(0,lambda y,_: y+1))
-print(val.reduce(0,lambda y,_: y+1))
-print(test.reduce(0,lambda y,_: y+1))
-
-print(train.filter(lambda example,label,weight: label==1).reduce(0,lambda y,_:y+1))
-print(val.filter(lambda example,label: label==1).reduce(0,lambda y,_:y+1))
-print(test.filter(lambda example,label: label==1).reduce(0,lambda y,_:y+1))
-'''

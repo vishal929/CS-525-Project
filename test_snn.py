@@ -8,7 +8,6 @@ from constants import ROOT_DIR
 import os
 from pathlib import Path
 import re
-#from keras_data_format_converter import convert_channels_first_to_last
 
 print(tf.config.get_visible_devices())
 
@@ -77,17 +76,14 @@ for model_path in model_paths:
 
     # repeating examples and labels for a certain number of timesteps only if our window size is not 12
     if window_size==1:
+        # examples should be (num_examples,timesteps,22x114=2508)
         examples = examples.reshape(num_examples,1,-1)
         examples = np.tile(examples, (1,timesteps,1))
         labels = np.expand_dims(labels,axis=-1).repeat(num_features,axis=-1)
         labels = np.expand_dims(labels,axis=1).repeat(timesteps,axis=1)
 
-    # examples should be (num_examples,timesteps,22x114=2508)
-    #print(examples.shape)
-    #print(labels.shape)
-
-    #print(converted.verify(inputs=np.ones((1,1,22,114))))
-
+   
+    
     if use_train:
         # prepping train data
         train_examples = train_set.map(lambda example, label, imbalance: example)
@@ -152,7 +148,6 @@ for model_path in model_paths:
                 train_pred = sim.predict(x=train_examples, n_steps=timesteps)
         non_snn_train_pred = non_snn_model.predict(train_examples[:, 0, :].reshape(-1, 1, 22, 114), batch_size=32)
         non_snn_train_pred = np.round(non_snn_train_pred.flatten())
-        # non_snn_train_pred = np.greater(non_snn_train_pred,0.5).astype(np.int32)
         print('num train examples: ' + str(num_train_examples))
 
     with converted.net:
@@ -171,7 +166,6 @@ for model_path in model_paths:
     non_snn_test_pred = non_snn_model.predict(examples[:,0,:].reshape(-1,1,22,114),batch_size=32)
     non_snn_test_pred = np.round(non_snn_test_pred.flatten())
     print('non_snn_test_pred shape: ' + str(non_snn_test_pred.shape))
-    #non_snn_test_pred = np.greater(non_snn_test_pred,0.5).astype(np.int32)
 
     print('num test examples: ' + str(num_examples))
 
@@ -191,7 +185,6 @@ for model_path in model_paths:
         non_snn_val_pred = np.round(non_snn_val_pred.flatten())
         print('non_snn val_pred shape: ' + str(non_snn_val_pred.shape))
         # converting non_snn_val_pred sigmoid values to actual predictions
-        #non_snn_val_pred = np.greater(non_snn_val_pred,0.5).astype(np.int32)
         print('num val examples: ' + str(num_val_examples))
 
 
@@ -201,7 +194,7 @@ for model_path in model_paths:
     # decoding by taking the mean activation
     test_pred = np.mean(test_pred,axis=-1).flatten()
 
-    # if decoded value <0 , then we give 0, if decoded value >0, we give 1
+    # if decoded value < 0 , then we give 0, if decoded value > 0, we give 1
     test_pred = np.greater(test_pred,0).astype(np.int32)
 
     # getting num predictions (in case input was truncated due to batch size)
@@ -218,7 +211,7 @@ for model_path in model_paths:
         # decoding by taking the mean activation
         train_pred = np.mean(train_pred, axis=-1).flatten()
 
-        # if decoded value <= 0 , then we give 0, if decoded value >0, we give 1 (this is because we removed the sigmoid)
+        # if decoded value <= 0 , then we give 0, if decoded value > 0, we give 1 (this is because we removed the sigmoid)
         train_pred = np.greater(train_pred,0).astype(np.int32)
         # getting num predictions(in case input was truncated due to batch size)
         num_train = train_pred.shape[0]
@@ -350,14 +343,6 @@ for model_path in model_paths:
         (non_snn_patient_accs[patient]).append(non_snn_test_acc)
     else:
         non_snn_patient_accs[patient] = [non_snn_test_acc]
-
-    #print(pred.shape)
-    #print(pred)
-    #print('pred shape: ' + str(pred.shape))
-    #print('labels shape: ' + str(labels.shape))
-    #print('accuracy: ' + str((np.equal(np.round(pred),labels)).astype(np.int32).mean()))
-
-
 
 # computing patient accuracies for each experiment
 for patient in patient_accs:

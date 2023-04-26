@@ -7,11 +7,6 @@ import os
 from constants import ROOT_DIR
 import numpy as np
 
-'''
-Not sure if it would be better to write train and test functions from scratch, 
-but Keras has built-in methods for this
-'''
-
 
 def train(model, tf_dataset, val_set, model_save_name, batch_size=32):
     # callback for creating the monitor that is the average of train and val AUC
@@ -36,8 +31,6 @@ def train(model, tf_dataset, val_set, model_save_name, batch_size=32):
     # batching and shuffling
     tf_dataset = tf_dataset.shuffle(buffer_size=100000).batch(batch_size, num_parallel_calls=4)
     val_set = val_set.batch(batch_size, num_parallel_calls=4)
-    # train_batch_size = ?, steps_per_epoch should be num_samples // train_batch_size
-    # val_batch_size = ?, validation_steps should be num_val_samples // val_batch_size
     trained_model = model.fit(tf_dataset, epochs=300, verbose=2, validation_data=val_set, callbacks=[create_monitor,
                                                                                                     early_stop,
                                                                                                     save_weights])
@@ -85,10 +78,8 @@ if specific_patient:
         tf_dataset,val_set,test_set = data_util.get_seizure_leave_out_data(seizure_number=seizure_index,
                                                                            window_size=window_size,
                                                                            patient=leave_out)
-
         if window_size == 1:
-            model_to_train = model.newBuildModel()
-            #model_to_train = model.buildModel() # this model has hard time with conversion
+            model_to_train = model.buildModel()
         else:
             model_to_train = recurrent_model.build_lmu(256, 784, 256, num_lmus=2)
         trained_model_results = train(model_to_train, tf_dataset, val_set, model_specific_name, batch_size=batch_size)
@@ -111,8 +102,7 @@ else:
         model_to_train = tf.keras.models.load_model(possible_checkpoint)
     else:
         if window_size==1:
-            model_to_train = model.newBuildModel()
-            #model_to_train = model.buildModel() # this model has trouble with conversion
+            model_to_train = model.buildModel()
         else:
             model_to_train = recurrent_model.build_lmu(256,784,256,num_lmus=2)
 
