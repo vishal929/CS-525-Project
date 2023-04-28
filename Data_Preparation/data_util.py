@@ -181,4 +181,17 @@ def get_seizure_leave_out_data(seizure_number,window_size=1,patient='chb01'):
     interictals = interictals.map(lambda example, label: (example, label, 1))
     train = ictals.concatenate(interictals)
 
+    # normalizing train, val, and test datasets
+    train_norm = tf.keras.layers.Normalization()
+    train_norm.adapt(train)
+    train = train.map(lambda example,label,weight: (train_norm(example),label,weight))
+    val_norm = tf.keras.layers.Normalization()
+    val_norm.adapt(val)
+    val = val.map(lambda example,label,weight: (val_norm(example),label,weight))
+    test_norm = tf.keras.layers.Normalization()
+    test_norm.adapt(test)
+    test = test.map(lambda example, label, weight: (test_norm(example), label, weight))
+
+
+
     return train,val,test
