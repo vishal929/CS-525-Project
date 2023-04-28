@@ -183,13 +183,13 @@ def get_seizure_leave_out_data(seizure_number,window_size=1,patient='chb01'):
 
     # normalizing train, val, and test datasets
     train_norm = tf.keras.layers.Normalization()
-    train_norm.adapt(train.map(lambda example,label,weight: example))
+    train_norm.adapt(list(iter(train.map(lambda example,label,weight: example))))
     train = train.map(lambda example,label,weight: (train_norm(example),label,weight))
     val_norm = tf.keras.layers.Normalization()
-    val_norm.adapt(val.map(lambda example,label: example))
+    val_norm.adapt(list(iter(val.map(lambda example,label: example))))
     val = val.map(lambda example,label,weight: (val_norm(example),label,weight))
     test_norm = tf.keras.layers.Normalization()
-    test_norm.adapt(test.map(lambda example,label: example))
+    test_norm.adapt(list(iter(test.map(lambda example,label: example))))
     test = test.map(lambda example, label, weight: (test_norm(example), label, weight))
 
 
