@@ -158,10 +158,12 @@ def get_seizure_leave_out_data(seizure_number,window_size=1,patient='chb01'):
     val_examples = val_examples.map(tf.squeeze, num_parallel_calls=4)
     test_examples = test_examples.map(tf.squeeze, num_parallel_calls=4)
     # if our window size is 1, we need to explicitly set a channel to process like an image
+    '''
     if window_size == 1:
         train_examples = train_examples.map(lambda example: tf.expand_dims(example, axis=0), num_parallel_calls=4)
         val_examples = val_examples.map(lambda example: tf.expand_dims(example, axis=0), num_parallel_calls=4)
         test_examples = test_examples.map(lambda example: tf.expand_dims(example, axis=0), num_parallel_calls=4)
+    '''
     train_labels = train.flat_map(lambda example, label: tf.data.Dataset.from_tensor_slices(label))
     val_labels = val.flat_map(lambda example, label: tf.data.Dataset.from_tensor_slices(label))
     test_labels = test.flat_map(lambda example, label: tf.data.Dataset.from_tensor_slices(label))
