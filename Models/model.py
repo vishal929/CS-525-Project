@@ -8,7 +8,7 @@ import os
 from Data_Preparation import data_util
 
 # Method for building the convolutional neural network:
-def buildModel():
+def buildModel(use_batchnorm=False):
     input = keras.Input(shape=(1, 22, 114))  # consists of 22 EEG channels
 
     # We apply the ReLU activation function to each of the three 2D convolutional layers
@@ -20,19 +20,22 @@ def buildModel():
     # For each channel, AvgPool2D() takes the average value within a designated window of the input of size (1, 2)
     x = keras.layers.AvgPool2D(pool_size=(1, 2), data_format="channels_first", padding='valid')(x)
     # Then, we normalize the average value just collected
-    x = keras.layers.BatchNormalization()(x) #
+    if use_batchnorm:
+        x = keras.layers.BatchNormalization()(x) #
 
     # The second layer has 32 kernals of size (1, 3)
     x = keras.layers.Conv2D(32, (1, 3), strides=(1, 1), padding='valid', data_format="channels_first",
                             activation=tf.nn.leaky_relu)(x)
     x = keras.layers.AvgPool2D(pool_size=(1, 2), data_format="channels_first", )(x)
-    x = keras.layers.BatchNormalization()(x)
+    if use_batchnorm:
+        x = keras.layers.BatchNormalization()(x)
 
     # The third and last convolutional layer has 64 kernals also of size (1, 3)
     x = keras.layers.Conv2D(64, (1, 3), strides=(1, 1), padding='valid', data_format="channels_first",
                             activation=tf.nn.leaky_relu)(x)
     x = keras.layers.AvgPool2D(pool_size=(1, 2), data_format="channels_first", )(x)
-    x = keras.layers.BatchNormalization()(x)
+    if use_batchnorm:
+        x = keras.layers.BatchNormalization()(x)
 
     # To create the 2 fully connected layers, we first flatten the extracted features
     x = keras.layers.Flatten()(x)
